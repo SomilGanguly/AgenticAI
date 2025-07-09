@@ -1,0 +1,483 @@
+Transcript
+March 26, 2025, 9:03AM
+
+Rohan Verma started transcription
+
+Rohon Mohapatra   0:09
+So line by line you have to read out or how is it? Just talk about. Just talk about it. OK. OK.
+
+Rohan Verma   0:12
+Just talk about it.
+Yeah, yeah, it should be able to pick it up.
+
+Rohon Mohapatra   0:14
+You should be able to pick it up right? So hi Rohan.
+
+Rohan Verma   0:17
+So hi, Rohan. Thank you for joining us so.
+
+Rohon Mohapatra   0:18
+Thank you for joining us. Hi.
+So I just have few questions. So before we start a migration, I just wanted to make sure that we are In Sync with all the requirements of yours.
+
+Rohan Verma   0:21
+So I just had few questions. So before we start the migration, I just wanted to make sure that we are In Sync with all the requirements of yours.
+So just wanted to discuss about what are specific soft applications right now?
+
+Rohon Mohapatra   0:29
+So just wanted to discuss about what a specific software applications right now.
+
+Rohan Verma   0:34
+So talking about that one right now, can you tell me something about I have some like parameters I need to know about, so I'll say that outline and you can just let me know what's the values of that one right.
+
+Rohon Mohapatra   0:34
+So talking about that one right now, can you tell me something about I have some like add parameters. I need to know about, so I'll say that outline, but I can you can just let me know what's the values of that one right so.
+
+Rohan Verma   0:47
+So.
+
+Rohon Mohapatra   0:49
+Application ID. Can you tell me about this one?
+
+Rohan Verma   0:49
+Application ID. Can you tell me about this one?
+
+Rohon Mohapatra   0:52
+It is a contoso app application ID OK and what was the name of it?
+
+Rohan Verma   0:54
+OK. And what about the name of it?
+
+Rohon Mohapatra   0:55
+It's also known as Contoso app. OK, OK, so every application will need an owner, right?
+
+Rohan Verma   0:58
+OK, OK.
+So every application will need an owner, right?
+
+Rohon Mohapatra   1:01
+So that we can contact that person.
+
+Rohan Verma   1:01
+So that we can contact that person.
+So can you tell me about the owner?
+
+Rohon Mohapatra   1:03
+So can you tell me about the owner?
+So the owner is Rohan Mahapatra. So I'll be the owner of this and and my e-mail ID would be rmohapatra@microsoft.com.
+
+Rohan Verma   1:09
+OK.
+That really helps actually.
+
+Rohon Mohapatra   1:15
+So we'll reach out to you in case we need to have any other questions regarding that one. Sure talk a little more about the application itself.
+
+Rohan Verma   1:15
+So we'll reach out to you in case we need to have any other questions regarding that one, talk a little more about the application itself. Can you talk a little about what's the application type?
+
+Rohon Mohapatra   1:20
+Can you talk a little about what's the application type?
+Yeah. So it's a kind of three tier application.
+
+Rohan Verma   1:27
+Yep.
+
+Rohon Mohapatra   1:27
+So it has got the web application and the DB.
+
+Rohan Verma   1:29
+Yeah.
+
+Rohon Mohapatra   1:30
+So that's the type of for the application. Mm hmm. And tell me who developed this application.
+
+Rohan Verma   1:32
+Yeah, yeah. And can you tell me who developed this application?
+Was it a vendor developed application or the commercial application in House developed commercial application?
+
+Rohon Mohapatra   1:36
+Was it a vendor application or application develop?
+It's a commercially off the shelf application which is available in the marketplace.
+
+Rohan Verma   1:43
+OK. OK. OK.
+And currently I think it's AWS, right?
+
+Rohon Mohapatra   1:44
+And currently I think it's right.
+That's right, it's on AWS.
+
+Rohan Verma   1:50
+OK. And is it internally facing or customer facing reset internal facing application?
+
+Rohon Mohapatra   1:50
+OK. And is it internally facing or has not facing?
+It's an internal facing application so it doesn't have any access to the Internet.
+
+Rohan Verma   1:57
+OK, OK. OK and.
+
+Rohon Mohapatra   1:57
+OK, OK. OK and.
+Is there any complicity requirements from this one?
+
+Rohan Verma   2:01
+Is there any complicity requirements from this one?
+
+Rohon Mohapatra   2:03
+Is it complex system or it is it's it's a complex system in the sense.
+
+Rohan Verma   2:03
+Is it a complex system or?
+Is it a complex system in the system?
+
+Rohon Mohapatra   2:07
+So we have got certain levels of complexity. So this is level 1 complexity of the application.
+
+Rohan Verma   2:08
+So we have a certain level of office, the level of.
+
+Rohon Mohapatra   2:12
+So. So that's the business criticality of this application.
+
+Rohan Verma   2:12
+OK, OK. Business critical.
+
+Rohon Mohapatra   2:15
+OK, OK.
+
+Rohan Verma   2:15
+OK, OK. So in terms of criticality, it's level one, OK. OK. And who are the expected users of this application?
+
+Rohon Mohapatra   2:15
+So in terms of criticality, it's level one level one, yes, yeah. And who are the expected users for this application?
+So it's mostly the internal users of the organization, yeah.
+
+Rohan Verma   2:24
+Users. Yeah. Yeah. And any numbers you have for, like, how many people are working on it?
+
+Rohon Mohapatra   2:25
+And any numbers you have for like how many people are working on it.
+Yeah. So there there's a in an average, it's hundred at a time, it's 100 people.
+
+Rohan Verma   2:33
+At a time of it's 100 people right now.
+
+Rohon Mohapatra   2:34
+Yes, right.
+Yeah. OK. OK.
+
+Rohan Verma   2:36
+OK, OK. Any dependencies depending on.
+
+Rohon Mohapatra   2:37
+Any dependencies depending on. It's mostly required to connect to the internal app and services.
+
+Rohan Verma   2:42
+OK, OK. Any messaging solutions use the.
+
+Rohon Mohapatra   2:42
+OK, OK. Any messaging solutions use.
+Yes, we're using the Office 365 for that is the SMTP connection established.
+
+Rohan Verma   2:46
+Office 360.
+OK, OK. OK. Another triple rely on any physical hardware?
+
+Rohon Mohapatra   2:50
+OK, OK. OK. And does it rely on any physical hardware? Uh, no physical hardware?
+Any what are the environments we are looking at?
+
+Rohan Verma   2:57
+Any what are the environments we are looking at?
+
+Rohon Mohapatra   3:00
+So there are two environments.
+One is production and staging here.
+
+Rohan Verma   3:05
+OK.
+
+Rohon Mohapatra   3:07
+So production environment, state environment, yes, right. Yeah. And what is like the main infrastructure host?
+
+Rohan Verma   3:07
+So production environment and stage environment, right?
+And what is like the main infrastructure host?
+
+Rohon Mohapatra   3:14
+It's the virtual machines virtual machines. So in case of PWS it'll be ECS VM.
+
+Rohan Verma   3:15
+Virtual machines. So in case of AWS it'll be ECS VM.
+
+Rohon Mohapatra   3:18
+Yeah, it is.
+EC.
+Two VM OK EC2 VMS.
+
+Rohan Verma   3:20
+OK, EC2VM.
+And what's the OS?
+
+Rohon Mohapatra   3:23
+And what's the OS?
+It's being used.
+
+Rohan Verma   3:24
+It's being using Windows.
+
+Rohon Mohapatra   3:25
+We're using the Windows 2019 Standard Edition.
+
+Rohan Verma   3:28
+Windows 19 OK.
+
+Rohon Mohapatra   3:28
+Windows P 19, yes.
+Either the containerized application, no. It'll be hosted on a VM on the other platform as well.
+
+Rohan Verma   3:31
+Is it a continuous application?
+
+Rohon Mohapatra   3:35
+So any specifications for the like?
+
+Rohan Verma   3:36
+So any specifications for the like those?
+
+Rohon Mohapatra   3:39
+Those compute, yes. So we can have eight CPU cores and a thirtytoggb memory and 500GB of storage for this.
+
+Rohan Verma   3:39
+Compute.
+Yeah.
+
+Rohon Mohapatra   3:46
+Oh, that's good.
+
+Rohan Verma   3:46
+Oh, that's good.
+Any clustering information or something like that scandal.
+
+Rohon Mohapatra   3:53
+Any clustering information or something like that?
+No, this is a standal application.
+So no cluster is needed.
+
+Rohan Verma   3:57
+So there's no information required in clustering and stuff.
+
+Rohon Mohapatra   3:58
+There's no information required in clustering and stuff, so there is any kind of depository that was depending on that one.
+
+Rohan Verma   4:00
+So they this any kind of repository that was depending on that one?
+
+Rohon Mohapatra   4:05
+No, no repository.
+Yeah. So is there any pass also involved here? No.
+
+Rohan Verma   4:07
+So is there any pass services also involved here?
+Any graphic card or something like that.
+
+Rohon Mohapatra   4:12
+Any traffic card or something like that?
+No graphic card involved.
+Yeah. OK. OK.
+
+Rohan Verma   4:16
+OK, OK.
+
+Rohon Mohapatra   4:18
+Databases. What databases are you using?
+
+Rohan Verma   4:18
+Databases. What databases are you using?
+
+Rohon Mohapatra   4:20
+We're using the SQL Server as a database.
+
+Rohan Verma   4:24
+And any size of that.
+
+Rohon Mohapatra   4:24
+And any size of that, it's less than one DB less than 1DB.
+
+Rohan Verma   4:27
+That's in one DB, OK.
+
+Rohon Mohapatra   4:28
+Yes, OK.
+
+Rohan Verma   4:31
+Hardware required solution.
+
+Rohon Mohapatra   4:31
+Hardware required solution.
+So is there any hardware requirements?
+
+Rohan Verma   4:33
+So is there any hardware requirements?
+
+Rohon Mohapatra   4:36
+So no specific hardware requirement, but yeah, the database is a highly available solution. OK, OK.
+
+Rohan Verma   4:41
+OK. OK, OK. OK. So what are the identity providers you're using?
+
+Rohon Mohapatra   4:43
+So what are the identity providers we're using?
+So we're using the ad DS for authentication. OK, OK.
+
+Rohan Verma   4:49
+OK, OK.
+Uh.
+So this computer on which we are deploying it this this application, is it also being shared by some other resources?
+
+Rohon Mohapatra   4:57
+This computer on which we are deploying it this this application is it also being shared by some other resources?
+No, it's not being shared by any other resources. Any government related network dependencies that is there for the application, no.
+
+Rohan Verma   5:08
+Any government related network dependencies that is there for the application.
+Bandwidth requirements.
+
+Rohon Mohapatra   5:15
+Requirements is there between 10 to 15 Gbps on average.
+
+Rohan Verma   5:18
+OK. OK. Load balances. What are the like at which Pokémon?
+
+Rohon Mohapatra   5:19
+OK. What are the like, admin slates, Pokémon?
+Yeah, we're using.
+It's working on the layer.
+Seven load balancer. We're using AF5 load balancer which is working as an actually OK OK.
+
+Rohan Verma   5:29
+OK. OK. So as per the like the file will be using for applications. OK, OK, OK. And any bcdr setups that you have in mind?
+
+Rohon Mohapatra   5:29
+So as per the like the using for applications, yes. Yep. OK, OK, OK. And any pcdr setups that you have in mind?
+No bcdr at this point for this. OK, OK. And in model one network is, yeah, since it's an internal application.
+
+Rohan Verma   5:42
+OK, OK. And in order for that, nothing is required there.
+Yeah. OK. OK.
+
+Rohon Mohapatra   5:48
+So everything is in house configured OK OK.
+
+Rohan Verma   5:53
+I think like any backup, as you mentioned, that is no backup involved.
+
+Rohon Mohapatra   5:53
+Any, like any backup as you mentioned that is no backup involved, so I don't think any computer for backup as well.
+
+Rohan Verma   5:58
+So I don't think we need any compute for backup as well.
+
+Rohon Mohapatra   6:01
+Yes, that's right, yeah.
+Any data classification standards are we following?
+
+Rohan Verma   6:05
+Any data classification standards are we following?
+
+Rohon Mohapatra   6:07
+Yes. So we are using the confidential type.
+There's a confidential type of data because we it involves the financial data, the healthcare data and the intellectual property data along with the personally identifiable information as well.
+So all this data highly regulated here, OK so.
+
+Rohan Verma   6:18
+OK.
+OK.
+
+Rohon Mohapatra   6:21
+We will need to make sure that we mark authority as confidential.
+
+Rohan Verma   6:22
+So we will need to make sure that we mark all 30 tasks confidential.
+
+Rohon Mohapatra   6:24
+Yes, yes. And monitoring those tools that we're using in place, no monitoring tool at this moment here.
+
+Rohan Verma   6:25
+Any monitoring tools that we're using in place?
+Any AW specific cloud services that we're using?
+
+Rohon Mohapatra   6:29
+Any AW specific cloud services that we are using?
+No, no. AWS specific cloud services, OK.
+
+Rohan Verma   6:36
+OK, OK.
+Any hardcoded values you have in that software.
+
+Rohon Mohapatra   6:40
+Any ******** values you have in that software.
+No hardcoded values in that.
+Yeah, dev OPS.
+Dev OPS, is it like online or on Prem?
+
+Rohan Verma   6:46
+Dev OPS, is it like online or on Prem?
+
+Rohon Mohapatra   6:48
+How is it it's on Prem actually?
+
+Rohan Verma   6:48
+How is it?
+
+Rohon Mohapatra   6:50
+Yeah, it's on Prem.
+
+Rohan Verma   6:50
+It's on Prem. OK, OK.
+
+Rohon Mohapatra   6:51
+Yes, OK. OK.
+So in that case, the pipelines need to be reconfigured there.
+
+Rohan Verma   6:53
+So in that case, the pipelines need to be reconfigured there, right?
+
+Rohon Mohapatra   6:57
+Yes, that's correct. Yeah.
+And any last comments you have for us?
+
+Rohan Verma   7:00
+And any last comments you have for this one?
+
+Rohon Mohapatra   7:02
+So basically this application is in mobile application.
+OK.
+So so it's being shared by the internal users, so no other comments. I think all the questionnaires are good. OK.
+
+Rohan Verma   7:12
+OK.
+
+Rohon Mohapatra   7:12
+Thanks for that.
+
+Rohan Verma   7:12
+Thanks for that one.
+
+Rohon Mohapatra   7:13
+Yeah. Thank you.
+
+Rohan Verma   7:14
+Yep.
+
+Rohon Mohapatra   7:17
+Let's see.
+What's there?
+Any questions?
+Disconnected me.
+Oh, OK.
+Sorry, sorry.
+
+Rohan Verma stopped transcription
