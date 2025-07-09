@@ -1,0 +1,8 @@
+.env
+Documentation/*
+__pycache__
+.chainlit
+chainlit.md
+SourceManifests/*
+TargetManifests/*
+ClusterReports/*

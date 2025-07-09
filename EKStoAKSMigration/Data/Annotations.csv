@@ -1,0 +1,4 @@
+EKS,AKS,New_Value
+service.beta.kubernetes.io/aws-load-balancer-internal,service.beta.kubernetes.io/azure-load-balancer-internal,same
+service.beta.kubernetes.io/aws-load-balancer-ssl-cert,service.beta.kubernetes.io/azure-load-balancer-ssl-cert,same
+aws-load-balancer-backend-protocol,appgw.ingress.kubernetes.io/backend-protocol,same

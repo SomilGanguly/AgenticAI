@@ -1,0 +1,61 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>ImageResizerFunction</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+
+    <properties>
+        <java.version>11</java.version>
+        <azure.functions.maven.plugin.version>1.16.0</azure.functions.maven.plugin.version>
+        <azure.functions.java.library.version>2.0.1</azure.functions.java.library.version>
+        <azure.storage.blob.version>12.21.0</azure.storage.blob.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.microsoft.azure.functions</groupId>
+            <artifactId>azure-functions-java-library</artifactId>
+            <version>${azure.functions.java.library.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.azure</groupId>
+            <artifactId>azure-storage-blob</artifactId>
+            <version>${azure.storage.blob.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>javax.xml.bind</groupId>
+            <artifactId>jaxb-api</artifactId>
+            <version>2.3.1</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>com.microsoft.azure.functions</groupId>
+                <artifactId>azure-functions-maven-plugin</artifactId>
+                <version>${azure.functions.maven.plugin.version}</version>
+                <configuration>
+                    <resourceGroup>ImageResizerRG</resourceGroup>
+                    <appName>image-resizer-func</appName>
+                    <appServicePlanName>image-resizer-func-plan</appServicePlanName>
+                    <region>westeurope</region>
+                    <runtime>
+                        <os>linux</os>
+                        <javaVersion>11</javaVersion>
+                        <webContainer>JAVA 11</webContainer>
+                    </runtime>
+                    <functions>
+                        <function>
+                            <name>ImageResizer</name>
+                        </function>
+                    </functions>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

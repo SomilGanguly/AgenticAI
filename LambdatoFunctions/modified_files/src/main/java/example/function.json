@@ -1,0 +1,19 @@
+{
+  "bindings": [
+    {
+      "type": "blobTrigger",
+      "direction": "in",
+      "name": "inputBlob",
+      "path": "images/{name}",
+      "connection": "AzureWebJobsStorage",
+      "dataType": "binary"
+    },
+    {
+      "type": "blob",
+      "direction": "out",
+      "name": "target",
+      "path": "images/resized-{name}",
+      "connection": "AzureWebJobsStorage"
+    }
+  ]
+}

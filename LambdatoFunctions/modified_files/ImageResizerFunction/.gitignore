@@ -1,0 +1,13 @@
+# Maven
+/target
+*.iml
+.classpath
+.project
+.settings/
+.idea/
+*.log
+local.settings.json
+*.jar
+*.war
+*.zip
+.DS_Store

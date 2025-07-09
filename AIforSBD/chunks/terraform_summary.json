@@ -1,0 +1,642 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.10.1",
+  "variables": {
+    "appId": {
+      "value": "20075"
+    },
+    "az_backup_enable": {
+      "value": true
+    },
+    "cmk": {
+      "value": null
+    },
+    "environment": {
+      "value": "dev"
+    },
+    "hub": {
+      "value": {
+        "firewall_name": "firewallo",
+        "hub_rg_name": "myResourceGroup",
+        "subscription_id": "177c1f84-4b2a-414d-974e-5fbdf5d84250",
+        "vnet_name": "vneto"
+      }
+    },
+    "is_odaa_peering_enabled": {
+      "value": false
+    },
+    "is_oracle_subscription": {
+      "value": false
+    },
+    "location": {
+      "value": "uksouth"
+    },
+    "odaa_peering": {
+      "value": {}
+    },
+    "overwrite_route_subnets_list": {
+      "value": []
+    },
+    "rbac_info_groupname": {
+      "value": {
+        "ADM-VF-Azure-UK-MSMigration-Admins": [
+          "Reader",
+          "Virtual Machine Contributor",
+          "Storage Blob Data Contributor",
+          "Key Vault Secrets User"
+        ]
+      }
+    },
+    "rbac_info_mi": {
+      "value": {
+        "id-azuuks-mcs-azmigrate-uk-level3": [
+          "Contributor",
+          "Storage Blob Data Contributor",
+          "Key Vault Secrets Officer"
+        ],
+        "id-azuuks-mcs-terraform-uk-level3": [
+          "Storage Blob Data Contributor",
+          "Key Vault Secrets Officer"
+        ]
+      }
+    },
+    "rbac_info_principalid": {
+      "value": {}
+    },
+    "rd_id": {
+      "value": "130"
+    },
+    "role_assignments": {
+      "value": {}
+    },
+    "storageaccount_ip_rules": {
+      "value": [
+        "185.69.146.0/24"
+      ]
+    },
+    "subnet": {
+      "value": [
+        {
+          "address": "10.147.133.192/27",
+          "network_security_rules": {},
+          "security_zone": "tp",
+          "tier": "agw"
+        },
+        {
+          "address": "10.147.133.224/29",
+          "network_security_rules": {},
+          "security_zone": "tp",
+          "tier": "presentation"
+        },
+        {
+          "address": "10.147.133.232/29",
+          "network_security_rules": {},
+          "security_zone": "ta",
+          "tier": "app"
+        },
+        {
+          "address": "10.147.133.240/29",
+          "network_security_rules": {},
+          "security_zone": "td",
+          "tier": "db"
+        }
+      ]
+    },
+    "tenant_id": {
+      "value": "68283f3b-8487-4c86-adb3-a5228f18b893"
+    },
+    "vnet_ip_range": {
+      "value": [
+        "10.147.133.192/26"
+      ]
+    },
+    "wl_subscription_id": {
+      "value": "177c1f84-4b2a-414d-974e-5fbdf5d84250"
+    }
+  },
+  "configuration": {
+    "provider_config": {
+      "azurerm": {
+        "name": "azurerm",
+        "full_name": "registry.terraform.io/hashicorp/azurerm",
+        "version_constraint": ">= 3.0.0",
+        "expressions": {
+          "features": [
+            {}
+          ],
+          "storage_use_azuread": {
+            "constant_value": true
+          },
+          "subscription_id": {
+            "references": [
+              "var.wl_subscription_id"
+            ]
+          }
+        }
+      },
+      "azurerm.hubsubscription": {
+        "name": "azurerm",
+        "full_name": "registry.terraform.io/hashicorp/azurerm",
+        "alias": "hubsubscription",
+        "version_constraint": ">= 3.0.0",
+        "expressions": {
+          "features": [
+            {}
+          ],
+          "subscription_id": {
+            "references": [
+              "var.hub.subscription_id",
+              "var.hub"
+            ]
+          }
+        }
+      },
+      "azurerm.odaa": {
+        "name": "azurerm",
+        "full_name": "registry.terraform.io/hashicorp/azurerm",
+        "alias": "odaa",
+        "version_constraint": ">= 3.0.0",
+        "expressions": {
+          "features": [
+            {}
+          ],
+          "subscription_id": {
+            "references": [
+              "var.is_odaa_peering_enabled",
+              "var.odaa_peering",
+              "local.odaa_env_key",
+              "var.wl_subscription_id"
+            ]
+          }
+        }
+      },
+      "module.avm-res-network-networksecuritygroup:modtm": {
+        "name": "modtm",
+        "full_name": "registry.terraform.io/azure/modtm",
+        "version_constraint": "~> 0.3",
+        "module_address": "module.avm-res-network-networksecuritygroup"
+      },
+      "module.avm-res-network-networksecuritygroup:random": {
+        "name": "random",
+        "full_name": "registry.terraform.io/hashicorp/random",
+        "version_constraint": "~> 3.5",
+        "module_address": "module.avm-res-network-networksecuritygroup"
+      },
+      "module.avm-res-network-routetable:modtm": {
+        "name": "modtm",
+        "full_name": "registry.terraform.io/azure/modtm",
+        "version_constraint": "~> 0.3",
+        "module_address": "module.avm-res-network-routetable"
+      },
+      "module.avm-res-network-routetable:random": {
+        "name": "random",
+        "full_name": "registry.terraform.io/hashicorp/random",
+        "version_constraint": ">= 3.5.0, < 4.0.0",
+        "module_address": "module.avm-res-network-routetable"
+      },
+      "module.avm-res-network-subnet:azapi": {
+        "name": "azapi",
+        "full_name": "registry.terraform.io/azure/azapi",
+        "version_constraint": ">= 1.13.0, < 3.0.0",
+        "module_address": "module.avm-res-network-subnet"
+      },
+      "module.avm-res-storage-storageaccount:azapi": {
+        "name": "azapi",
+        "full_name": "registry.terraform.io/azure/azapi",
+        "version_constraint": ">= 1.14.0, < 3.0.0",
+        "module_address": "module.avm-res-storage-storageaccount"
+      },
+      "module.avm-res-storage-storageaccount:modtm": {
+        "name": "modtm",
+        "full_name": "registry.terraform.io/azure/modtm",
+        "version_constraint": "~> 0.3",
+        "module_address": "module.avm-res-storage-storageaccount"
+      },
+      "module.avm-res-storage-storageaccount:random": {
+        "name": "random",
+        "full_name": "registry.terraform.io/hashicorp/random",
+        "version_constraint": ">= 3.5.0, < 4.0.0",
+        "module_address": "module.avm-res-storage-storageaccount"
+      },
+      "module.keyvault:modtm": {
+        "name": "modtm",
+        "full_name": "registry.terraform.io/azure/modtm",
+        "version_constraint": "~> 0.3",
+        "module_address": "module.keyvault"
+      },
+      "module.keyvault:random": {
+        "name": "random",
+        "full_name": "registry.terraform.io/hashicorp/random",
+        "version_constraint": "~> 3.5",
+        "module_address": "module.keyvault"
+      },
+      "module.keyvault:time": {
+        "name": "time",
+        "full_name": "registry.terraform.io/hashicorp/time",
+        "version_constraint": "~> 0.9",
+        "module_address": "module.keyvault"
+      },
+      "module.lz_vending.module.roleassignment:azurerm": {
+        "name": "azurerm",
+        "full_name": "registry.terraform.io/hashicorp/azurerm",
+        "version_constraint": ">= 3.7.0",
+        "module_address": "module.lz_vending.module.roleassignment"
+      },
+      "module.lz_vending.module.roleassignment_umi:azurerm": {
+        "name": "azurerm",
+        "full_name": "registry.terraform.io/hashicorp/azurerm",
+        "version_constraint": ">= 3.7.0",
+        "module_address": "module.lz_vending.module.roleassignment_umi"
+      },
+      "module.lz_vending.module.subscription:azurerm": {
+        "name": "azurerm",
+        "full_name": "registry.terraform.io/hashicorp/azurerm",
+        "version_constraint": ">= 3.7.0",
+        "module_address": "module.lz_vending.module.subscription"
+      },
+      "module.lz_vending.module.subscription:terraform": {
+        "name": "terraform",
+        "full_name": "terraform.io/builtin/terraform",
+        "module_address": "module.lz_vending.module.subscription"
+      },
+      "module.lz_vending.module.subscription:time": {
+        "name": "time",
+        "full_name": "registry.terraform.io/hashicorp/time",
+        "version_constraint": ">= 0.9.1",
+        "module_address": "module.lz_vending.module.subscription"
+      },
+      "module.lz_vending:azapi": {
+        "name": "azapi",
+        "full_name": "registry.terraform.io/azure/azapi",
+        "version_constraint": "~> 1.4",
+        "module_address": "module.lz_vending"
+      }
+    },
+    "root_module": {
+      "resources": [
+        {
+          "type": "azurerm_network_security_group",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_network_security_rule",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_network_security_rule",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_network_security_group",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_network_security_rule",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_network_security_rule",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_network_security_group",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_network_security_rule",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_network_security_rule",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_network_security_group",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_network_security_rule",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_network_security_rule",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_route",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_route",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_route",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_route_table",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azapi_resource",
+          "name": "subnet",
+          "provider": "registry.terraform.io/azure/azapi",
+          "mode": "managed"
+        },
+        {
+          "type": "azapi_resource",
+          "name": "subnet",
+          "provider": "registry.terraform.io/azure/azapi",
+          "mode": "managed"
+        },
+        {
+          "type": "azapi_resource",
+          "name": "subnet",
+          "provider": "registry.terraform.io/azure/azapi",
+          "mode": "managed"
+        },
+        {
+          "type": "azapi_resource",
+          "name": "subnet",
+          "provider": "registry.terraform.io/azure/azapi",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_storage_account",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_key_vault",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azapi_resource",
+          "name": "telemetry_root",
+          "provider": "registry.terraform.io/azure/azapi",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_network_security_group",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_network_security_rule",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_network_security_rule",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_network_security_group",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_network_security_rule",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_network_security_rule",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_network_security_group",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_network_security_rule",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_network_security_rule",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_network_security_group",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_network_security_rule",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_network_security_rule",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_route",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_route",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_route",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_route_table",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azapi_resource",
+          "name": "subnet",
+          "provider": "registry.terraform.io/azure/azapi",
+          "mode": "managed"
+        },
+        {
+          "type": "azapi_resource",
+          "name": "subnet",
+          "provider": "registry.terraform.io/azure/azapi",
+          "mode": "managed"
+        },
+        {
+          "type": "azapi_resource",
+          "name": "subnet",
+          "provider": "registry.terraform.io/azure/azapi",
+          "mode": "managed"
+        },
+        {
+          "type": "azapi_resource",
+          "name": "subnet",
+          "provider": "registry.terraform.io/azure/azapi",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_storage_account",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azurerm_key_vault",
+          "name": "this",
+          "provider": "registry.terraform.io/hashicorp/azurerm",
+          "mode": "managed"
+        },
+        {
+          "type": "azapi_resource",
+          "name": "telemetry_root",
+          "provider": "registry.terraform.io/azure/azapi",
+          "mode": "managed"
+        },
+        {
+          "type": "azapi_resource",
+          "name": "rg",
+          "provider": "registry.terraform.io/azure/azapi",
+          "mode": "managed"
+        },
+        {
+          "type": "azapi_resource",
+          "name": "rg",
+          "provider": "registry.terraform.io/azure/azapi",
+          "mode": "managed"
+        },
+        {
+          "type": "azapi_resource",
+          "name": "rg",
+          "provider": "registry.terraform.io/azure/azapi",
+          "mode": "managed"
+        },
+        {
+          "type": "azapi_resource",
+          "name": "rg",
+          "provider": "registry.terraform.io/azure/azapi",
+          "mode": "managed"
+        },
+        {
+          "type": "azapi_resource",
+          "name": "rg",
+          "provider": "registry.terraform.io/azure/azapi",
+          "mode": "managed"
+        },
+        {
+          "type": "azapi_resource",
+          "name": "rg",
+          "provider": "registry.terraform.io/azure/azapi",
+          "mode": "managed"
+        },
+        {
+          "type": "azapi_resource",
+          "name": "rg",
+          "provider": "registry.terraform.io/azure/azapi",
+          "mode": "managed"
+        },
+        {
+          "type": "azapi_resource",
+          "name": "peering_hub_inbound",
+          "provider": "registry.terraform.io/azure/azapi",
+          "mode": "managed"
+        },
+        {
+          "type": "azapi_resource",
+          "name": "peering_hub_outbound",
+          "provider": "registry.terraform.io/azure/azapi",
+          "mode": "managed"
+        },
+        {
+          "type": "azapi_resource",
+          "name": "rg",
+          "provider": "registry.terraform.io/azure/azapi",
+          "mode": "managed"
+        },
+        {
+          "type": "azapi_resource",
+          "name": "vnet",
+          "provider": "registry.terraform.io/azure/azapi",
+          "mode": "managed"
+        },
+        {
+          "type": "azapi_update_resource",
+          "name": "vnet",
+          "provider": "registry.terraform.io/azure/azapi",
+          "mode": "managed"
+        }
+      ]
+    }
+  },
+  "summary": {
+    "total_resources": 58,
+    "resource_types": {
+      "azurerm_network_security_group": 8,
+      "azurerm_network_security_rule": 16,
+      "azurerm_route": 6,
+      "azurerm_route_table": 2,
+      "azapi_resource": 21,
+      "azurerm_storage_account": 2,
+      "azurerm_key_vault": 2,
+      "azapi_update_resource": 1
+    },
+    "provider_summary": {}
+  }
+}
