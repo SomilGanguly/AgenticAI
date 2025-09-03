@@ -1,0 +1,37 @@
+{
+  "security_gaps": [
+    {
+      "resource_type": "azurerm_key_vault",
+      "resource_name": "main",
+      "security_issue": "RBAC Authorization is not enabled for Key Vault",
+      "severity": "high",
+      "baseline_reference": "SCF-RES-01-01",
+      "recommendation": "Enable RBAC Authorization for stricter access control.",
+      "terraform_fix": "set \"enable_rbac_authorization\" to true in azurerm_key_vault resource configuration."
+    },
+    {
+      "resource_type": "azurerm_key_vault",
+      "resource_name": "main",
+      "security_issue": "Key Vault network ACL allows bypass for Azure Services (potential exposure risk).",
+      "severity": "medium",
+      "baseline_reference": "SCF-SEC-03",
+      "recommendation": "Restrict bypass for network ACLs or limit IP rules.",
+      "terraform_fix": "Replace \"bypass\" value with \"None\" or add specific IP Rules in network ACL configuration."
+    },
+    {
+      "resource_type": "variable",
+      "resource_name": "sql_admin_password",
+      "security_issue": "Potential plaintext password found in variables.",
+      "severity": "high",
+      "baseline_reference": "SCF-RES-01-05",
+      "recommendation": "Remove plaintext passwords from Terraform files and use secure parameter stores.",
+      "terraform_fix": "Store passwords in Azure Key Vault or a secure secrets store and reference them securely."
+    }
+  ],
+  "summary": {
+    "total_issues": 3,
+    "high_severity": 2,
+    "medium_severity": 1,
+    "low_severity": 0
+  }
+}

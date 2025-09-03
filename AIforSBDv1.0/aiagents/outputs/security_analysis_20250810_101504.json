@@ -1,0 +1,37 @@
+{
+  "security_gaps": [
+    {
+      "resource_type": "azurerm_key_vault",
+      "resource_name": "main",
+      "security_issue": "Network ACL allows 'AzureServices' bypass with default allow action.",
+      "severity": "high",
+      "baseline_reference": "SCF-SEC-03-01 Cloud Workload Protection Platform",
+      "recommendation": "Restrict access by configuring IP rules or virtual network constraints.",
+      "terraform_fix": "Update \"network_acls\" to specify proper restrictions."
+    },
+    {
+      "resource_type": "azurerm_key_vault",
+      "resource_name": "main",
+      "security_issue": "RBAC authorization is not explicitly enabled for the Key Vault.",
+      "severity": "medium",
+      "baseline_reference": "SCF-RES-01-02 Enable least privilege on the control plane.",
+      "recommendation": "Enable RBAC authorization for fine-grained access control.",
+      "terraform_fix": "Set \"enable_rbac_authorization\" to true in the Key Vault configuration."
+    },
+    {
+      "resource_type": "variable",
+      "resource_name": "sql_admin_password",
+      "security_issue": "Sensitive variable contains plaintext password.",
+      "severity": "high",
+      "baseline_reference": "SCF-RES-01-05 Detect exposed secrets in deployments.",
+      "recommendation": "Store sensitive values in Azure Key Vault and reference them securely.",
+      "terraform_fix": "Store \"sql_admin_password\" in Azure Key Vault and use \"azurerm_key_vault_secret\" to retrieve it."
+    }
+  ],
+  "summary": {
+    "total_issues": 3,
+    "high_severity": 2,
+    "medium_severity": 1,
+    "low_severity": 0
+  }
+}

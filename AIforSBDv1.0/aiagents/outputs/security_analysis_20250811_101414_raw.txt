@@ -1,0 +1,17 @@
+import json
+
+# Parse the Terraform configuration JSON
+terraform_data = json.loads(terraform_configuration)
+
+# Extract key details like variables, outputs, and planned resources for analysis
+variables = terraform_data.get('variables', {})
+outputs = terraform_data.get('planned_values', {}).get('outputs', {})
+root_resources = terraform_data.get('planned_values', {}).get('root_module', {}).get('resources', [])
+
+# Summarize the extracted data
+{
+    "variables": variables,
+    "outputs": outputs,
+    "total_resources": len(root_resources),
+    "resource_samples": root_resources[:3]  # Show a few resource samples for inspection
+}

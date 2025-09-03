@@ -1,0 +1,12 @@
+# Existing dependencies
+semantic-kernel
+azure-ai-agents
+azure-identity
+python-dotenv
+
+# New dependencies for GitHub and Terraform
+GitPython>=3.1.0
+azure-search-documents>=11.4.0
+
+# If you need to parse Terraform files
+python-hcl2>=4.3.0

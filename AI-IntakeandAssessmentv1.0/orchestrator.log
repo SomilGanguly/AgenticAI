@@ -1,0 +1,224 @@
+2025-09-02 18:20:55,538 [DEBUG] azureaiapp: Verbose logging enabled (APP_VERBOSE=true)
+2025-09-02 18:20:55,538 [DEBUG] azureaiapp: Verbose logging enabled (APP_VERBOSE=true)
+2025-09-02 18:20:55,541 [DEBUG] azureaiapp: Initializing SK AzureAIAgent and credentials
+2025-09-02 18:20:55,541 [DEBUG] azureaiapp: Initializing SK AzureAIAgent and credentials
+2025-09-02 18:20:58,225 [DEBUG] azureaiapp: Resolving AzureAIAgentSettings
+2025-09-02 18:20:58,225 [DEBUG] azureaiapp: Resolving AzureAIAgentSettings
+2025-09-02 18:20:58,230 [DEBUG] azureaiapp: Resolved endpoint=https://migrate-assessment-westus-003.services.ai.azure.com/api/projects/MigrateAssessmentProject, deployment=gpt-4.1
+2025-09-02 18:20:58,230 [DEBUG] azureaiapp: Resolved endpoint=https://migrate-assessment-westus-003.services.ai.azure.com/api/projects/MigrateAssessmentProject, deployment=gpt-4.1
+2025-09-02 18:21:24,634 [DEBUG] azureaiapp: Using Application ID: 2001
+2025-09-02 18:21:24,634 [DEBUG] azureaiapp: Using Application ID: 2001
+2025-09-02 18:21:36,388 [DEBUG] azureaiapp: Creating container '2001'
+2025-09-02 18:21:36,388 [DEBUG] azureaiapp: Creating container '2001'
+2025-09-02 18:22:50,742 [INFO] azureaiapp: Triggering indexing function for appId=2001, container=2001
+2025-09-02 18:22:50,742 [INFO] azureaiapp: Triggering indexing function for appId=2001, container=2001
+2025-09-02 18:22:50,743 [ERROR] azureaiapp: Failed to trigger indexing: containerdataingestion-aqeaeah5a9h6czcq.westus-01.azurewebsites.net
+2025-09-02 18:22:50,743 [ERROR] azureaiapp: Failed to trigger indexing: containerdataingestion-aqeaeah5a9h6czcq.westus-01.azurewebsites.net
+2025-09-02 18:23:02,410 [INFO] azureaiapp: Triggering indexing function for appId=2001, container=2001
+2025-09-02 18:23:02,410 [INFO] azureaiapp: Triggering indexing function for appId=2001, container=2001
+2025-09-02 18:23:02,414 [ERROR] azureaiapp: Failed to trigger indexing: containerdataingestion-aqeaeah5a9h6czcq.westus-01.azurewebsites.net
+2025-09-02 18:23:02,414 [ERROR] azureaiapp: Failed to trigger indexing: containerdataingestion-aqeaeah5a9h6czcq.westus-01.azurewebsites.net
+2025-09-02 18:30:07,705 [DEBUG] azureaiapp: Verbose logging enabled (APP_VERBOSE=true)
+2025-09-02 18:30:07,705 [DEBUG] azureaiapp: Verbose logging enabled (APP_VERBOSE=true)
+2025-09-02 18:30:07,707 [DEBUG] azureaiapp: Initializing SK AzureAIAgent and credentials
+2025-09-02 18:30:07,707 [DEBUG] azureaiapp: Initializing SK AzureAIAgent and credentials
+2025-09-02 18:30:10,154 [DEBUG] azureaiapp: Resolving AzureAIAgentSettings
+2025-09-02 18:30:10,154 [DEBUG] azureaiapp: Resolving AzureAIAgentSettings
+2025-09-02 18:30:10,162 [DEBUG] azureaiapp: Resolved endpoint=https://migrate-assessment-westus-003.services.ai.azure.com/api/projects/MigrateAssessmentProject, deployment=gpt-4.1
+2025-09-02 18:30:10,162 [DEBUG] azureaiapp: Resolved endpoint=https://migrate-assessment-westus-003.services.ai.azure.com/api/projects/MigrateAssessmentProject, deployment=gpt-4.1
+2025-09-02 18:30:17,365 [DEBUG] azureaiapp: Using Application ID: 2001
+2025-09-02 18:30:17,365 [DEBUG] azureaiapp: Using Application ID: 2001
+2025-09-02 18:30:35,193 [INFO] azureaiapp: Triggering indexing function for appId=2001, container=2001
+2025-09-02 18:30:35,193 [INFO] azureaiapp: Triggering indexing function for appId=2001, container=2001
+2025-09-02 18:31:36,593 [ERROR] azureaiapp: Failed to trigger indexing: 503, message='Attempt to decode JSON with unexpected mimetype: text/html', url='https://containerdataingestion-aqeaeah5a9h6czcq.westus-01.azurewebsites.net/api/index'
+2025-09-02 18:31:36,593 [ERROR] azureaiapp: Failed to trigger indexing: 503, message='Attempt to decode JSON with unexpected mimetype: text/html', url='https://containerdataingestion-aqeaeah5a9h6czcq.westus-01.azurewebsites.net/api/index'
+2025-09-02 18:38:24,226 [DEBUG] azureaiapp: Verbose logging enabled (APP_VERBOSE=true)
+2025-09-02 18:38:24,226 [DEBUG] azureaiapp: Verbose logging enabled (APP_VERBOSE=true)
+2025-09-02 18:38:24,231 [DEBUG] azureaiapp: Initializing SK AzureAIAgent and credentials
+2025-09-02 18:38:24,231 [DEBUG] azureaiapp: Initializing SK AzureAIAgent and credentials
+2025-09-02 18:38:26,350 [DEBUG] azureaiapp: Resolving AzureAIAgentSettings
+2025-09-02 18:38:26,350 [DEBUG] azureaiapp: Resolving AzureAIAgentSettings
+2025-09-02 18:38:26,360 [DEBUG] azureaiapp: Resolved endpoint=https://migrate-assessment-westus-003.services.ai.azure.com/api/projects/MigrateAssessmentProject, deployment=gpt-4.1
+2025-09-02 18:38:26,360 [DEBUG] azureaiapp: Resolved endpoint=https://migrate-assessment-westus-003.services.ai.azure.com/api/projects/MigrateAssessmentProject, deployment=gpt-4.1
+2025-09-02 18:38:30,090 [DEBUG] azureaiapp: Using Application ID: 2001
+2025-09-02 18:38:30,090 [DEBUG] azureaiapp: Using Application ID: 2001
+2025-09-02 18:38:48,227 [INFO] azureaiapp: Triggering indexing function for appId=2001, container=2001
+2025-09-02 18:38:48,227 [INFO] azureaiapp: Triggering indexing function for appId=2001, container=2001
+2025-09-02 18:38:48,227 [DEBUG] azureaiapp: Function URL: https://containerdataingestion-aqeaeah5a9h6czcq.westus-01.azurewebsites.net/api/index
+2025-09-02 18:38:48,227 [DEBUG] azureaiapp: Function URL: https://containerdataingestion-aqeaeah5a9h6czcq.westus-01.azurewebsites.net/api/index
+2025-09-02 18:39:49,539 [ERROR] azureaiapp: Failed to trigger indexing: 503, message='Attempt to decode JSON with unexpected mimetype: text/html', url='https://containerdataingestion-aqeaeah5a9h6czcq.westus-01.azurewebsites.net/api/index'
+2025-09-02 18:39:49,539 [ERROR] azureaiapp: Failed to trigger indexing: 503, message='Attempt to decode JSON with unexpected mimetype: text/html', url='https://containerdataingestion-aqeaeah5a9h6czcq.westus-01.azurewebsites.net/api/index'
+2025-09-02 19:31:20,770 [DEBUG] azureaiapp: Verbose logging enabled (APP_VERBOSE=true)
+2025-09-02 19:31:20,770 [DEBUG] azureaiapp: Verbose logging enabled (APP_VERBOSE=true)
+2025-09-02 19:31:20,773 [DEBUG] azureaiapp: Initializing SK AzureAIAgent and credentials
+2025-09-02 19:31:20,773 [DEBUG] azureaiapp: Initializing SK AzureAIAgent and credentials
+2025-09-02 19:31:23,440 [DEBUG] azureaiapp: Resolving AzureAIAgentSettings
+2025-09-02 19:31:23,440 [DEBUG] azureaiapp: Resolving AzureAIAgentSettings
+2025-09-02 19:31:23,444 [DEBUG] azureaiapp: Resolved endpoint=https://migrate-assessment-westus-003.services.ai.azure.com/api/projects/MigrateAssessmentProject, deployment=gpt-4.1
+2025-09-02 19:31:23,444 [DEBUG] azureaiapp: Resolved endpoint=https://migrate-assessment-westus-003.services.ai.azure.com/api/projects/MigrateAssessmentProject, deployment=gpt-4.1
+2025-09-02 19:33:07,505 [DEBUG] azureaiapp: Using Application ID: 2001
+2025-09-02 19:33:07,505 [DEBUG] azureaiapp: Using Application ID: 2001
+2025-09-02 19:33:22,410 [INFO] azureaiapp: Triggering indexing function for appId=2001, container=2001
+2025-09-02 19:33:22,410 [INFO] azureaiapp: Triggering indexing function for appId=2001, container=2001
+2025-09-02 19:33:22,410 [DEBUG] azureaiapp: Function URL: https://containerdataingestion-aqeaeah5a9h6czcq.westus-01.azurewebsites.net/api/index
+2025-09-02 19:33:22,410 [DEBUG] azureaiapp: Function URL: https://containerdataingestion-aqeaeah5a9h6czcq.westus-01.azurewebsites.net/api/index
+2025-09-02 19:34:23,809 [ERROR] azureaiapp: Failed to trigger indexing: 503, message='Attempt to decode JSON with unexpected mimetype: text/html', url='https://containerdataingestion-aqeaeah5a9h6czcq.westus-01.azurewebsites.net/api/index'
+2025-09-02 19:34:23,809 [ERROR] azureaiapp: Failed to trigger indexing: 503, message='Attempt to decode JSON with unexpected mimetype: text/html', url='https://containerdataingestion-aqeaeah5a9h6czcq.westus-01.azurewebsites.net/api/index'
+2025-09-02 19:36:02,525 [INFO] azureaiapp: Configured Azure AI Search tool with index 'mgassessearch' (query_type=SIMPLE)
+2025-09-02 19:36:02,525 [INFO] azureaiapp: Configured Azure AI Search tool with index 'mgassessearch' (query_type=SIMPLE)
+2025-09-02 19:36:02,527 [INFO] azureaiapp: Creating new agent
+2025-09-02 19:36:02,527 [INFO] azureaiapp: Creating new agent
+2025-09-02 19:36:03,245 [INFO] azureaiapp: Created agent, ID: asst_Xcw2yXXkPAM1SSTA2ZiDIYtQ
+2025-09-02 19:36:03,245 [INFO] azureaiapp: Created agent, ID: asst_Xcw2yXXkPAM1SSTA2ZiDIYtQ
+2025-09-02 19:37:33,245 [INFO] azureaiapp: Found existing agent named '2001', ID: asst_Xcw2yXXkPAM1SSTA2ZiDIYtQ
+2025-09-02 19:37:33,245 [INFO] azureaiapp: Found existing agent named '2001', ID: asst_Xcw2yXXkPAM1SSTA2ZiDIYtQ
+2025-09-02 19:37:40,691 [INFO] azureaiapp: Configured Azure AI Search tool with index 'mgassessearch' (query_type=SIMPLE)
+2025-09-02 19:37:40,691 [INFO] azureaiapp: Configured Azure AI Search tool with index 'mgassessearch' (query_type=SIMPLE)
+2025-09-02 19:37:41,332 [INFO] azureaiapp: Updated existing agent instructions/toolset
+2025-09-02 19:37:41,332 [INFO] azureaiapp: Updated existing agent instructions/toolset
+2025-09-02 19:45:30,579 [DEBUG] azureaiapp: Verbose logging enabled (APP_VERBOSE=true)
+2025-09-02 19:45:30,579 [DEBUG] azureaiapp: Verbose logging enabled (APP_VERBOSE=true)
+2025-09-02 19:45:30,587 [DEBUG] azureaiapp: Initializing SK AzureAIAgent and credentials
+2025-09-02 19:45:30,587 [DEBUG] azureaiapp: Initializing SK AzureAIAgent and credentials
+2025-09-02 19:45:33,274 [DEBUG] azureaiapp: Resolving AzureAIAgentSettings
+2025-09-02 19:45:33,274 [DEBUG] azureaiapp: Resolving AzureAIAgentSettings
+2025-09-02 19:45:33,278 [DEBUG] azureaiapp: Resolved endpoint=https://migrate-assessment-westus-003.services.ai.azure.com/api/projects/MigrateAssessmentProject, deployment=gpt-4.1
+2025-09-02 19:45:33,278 [DEBUG] azureaiapp: Resolved endpoint=https://migrate-assessment-westus-003.services.ai.azure.com/api/projects/MigrateAssessmentProject, deployment=gpt-4.1
+2025-09-02 19:45:40,969 [DEBUG] azureaiapp: Using Application ID: 2002
+2025-09-02 19:45:40,969 [DEBUG] azureaiapp: Using Application ID: 2002
+2025-09-02 19:45:48,347 [DEBUG] azureaiapp: Creating container '2002'
+2025-09-02 19:45:48,347 [DEBUG] azureaiapp: Creating container '2002'
+2025-09-02 19:46:46,358 [INFO] azureaiapp: Triggering indexing function for appId=2002, container=2002
+2025-09-02 19:46:46,358 [INFO] azureaiapp: Triggering indexing function for appId=2002, container=2002
+2025-09-02 19:46:46,358 [DEBUG] azureaiapp: Function URL: https://containerdataingestion-aqeaeah5a9h6czcq.westus-01.azurewebsites.net/api/index
+2025-09-02 19:46:46,358 [DEBUG] azureaiapp: Function URL: https://containerdataingestion-aqeaeah5a9h6czcq.westus-01.azurewebsites.net/api/index
+2025-09-02 19:47:47,608 [ERROR] azureaiapp: Failed to trigger indexing: 503, message='Attempt to decode JSON with unexpected mimetype: text/html', url='https://containerdataingestion-aqeaeah5a9h6czcq.westus-01.azurewebsites.net/api/index'
+2025-09-02 19:47:47,608 [ERROR] azureaiapp: Failed to trigger indexing: 503, message='Attempt to decode JSON with unexpected mimetype: text/html', url='https://containerdataingestion-aqeaeah5a9h6czcq.westus-01.azurewebsites.net/api/index'
+2025-09-02 19:57:13,372 [DEBUG] azureaiapp: Verbose logging enabled (APP_VERBOSE=true)
+2025-09-02 19:57:13,372 [DEBUG] azureaiapp: Verbose logging enabled (APP_VERBOSE=true)
+2025-09-02 19:57:13,380 [DEBUG] azureaiapp: Initializing SK AzureAIAgent and credentials
+2025-09-02 19:57:13,380 [DEBUG] azureaiapp: Initializing SK AzureAIAgent and credentials
+2025-09-02 19:57:16,844 [DEBUG] azureaiapp: Resolving AzureAIAgentSettings
+2025-09-02 19:57:16,844 [DEBUG] azureaiapp: Resolving AzureAIAgentSettings
+2025-09-02 19:57:16,851 [DEBUG] azureaiapp: Resolved endpoint=https://migrate-assessment-westus-003.services.ai.azure.com/api/projects/MigrateAssessmentProject, deployment=gpt-4.1
+2025-09-02 19:57:16,851 [DEBUG] azureaiapp: Resolved endpoint=https://migrate-assessment-westus-003.services.ai.azure.com/api/projects/MigrateAssessmentProject, deployment=gpt-4.1
+2025-09-02 19:57:31,921 [DEBUG] azureaiapp: Using Application ID: 2001
+2025-09-02 19:57:31,921 [DEBUG] azureaiapp: Using Application ID: 2001
+2025-09-02 19:58:05,975 [DEBUG] azureaiapp: Verbose logging enabled (APP_VERBOSE=true)
+2025-09-02 19:58:05,975 [DEBUG] azureaiapp: Verbose logging enabled (APP_VERBOSE=true)
+2025-09-02 19:58:05,975 [DEBUG] azureaiapp: Initializing SK AzureAIAgent and credentials
+2025-09-02 19:58:05,975 [DEBUG] azureaiapp: Initializing SK AzureAIAgent and credentials
+2025-09-02 19:58:08,757 [DEBUG] azureaiapp: Resolving AzureAIAgentSettings
+2025-09-02 19:58:08,757 [DEBUG] azureaiapp: Resolving AzureAIAgentSettings
+2025-09-02 19:58:08,765 [DEBUG] azureaiapp: Resolved endpoint=https://migrate-assessment-westus-003.services.ai.azure.com/api/projects/MigrateAssessmentProject, deployment=gpt-4.1
+2025-09-02 19:58:08,765 [DEBUG] azureaiapp: Resolved endpoint=https://migrate-assessment-westus-003.services.ai.azure.com/api/projects/MigrateAssessmentProject, deployment=gpt-4.1
+2025-09-02 19:58:35,251 [DEBUG] azureaiapp: Using Application ID: 2002
+2025-09-02 19:58:35,251 [DEBUG] azureaiapp: Using Application ID: 2002
+2025-09-02 19:58:43,082 [INFO] azureaiapp: Created table: AppDetails2002
+2025-09-02 19:58:43,082 [INFO] azureaiapp: Created table: AppDetails2002
+2025-09-02 20:06:08,999 [DEBUG] azureaiapp: Verbose logging enabled (APP_VERBOSE=true)
+2025-09-02 20:06:08,999 [DEBUG] azureaiapp: Verbose logging enabled (APP_VERBOSE=true)
+2025-09-02 20:06:08,999 [DEBUG] azureaiapp: Initializing SK AzureAIAgent and credentials
+2025-09-02 20:06:08,999 [DEBUG] azureaiapp: Initializing SK AzureAIAgent and credentials
+2025-09-02 20:06:12,620 [DEBUG] azureaiapp: Resolving AzureAIAgentSettings
+2025-09-02 20:06:12,620 [DEBUG] azureaiapp: Resolving AzureAIAgentSettings
+2025-09-02 20:06:12,621 [DEBUG] azureaiapp: Resolved endpoint=https://migrate-assessment-westus-003.services.ai.azure.com/api/projects/MigrateAssessmentProject, deployment=gpt-4.1
+2025-09-02 20:06:12,621 [DEBUG] azureaiapp: Resolved endpoint=https://migrate-assessment-westus-003.services.ai.azure.com/api/projects/MigrateAssessmentProject, deployment=gpt-4.1
+2025-09-02 20:06:32,189 [DEBUG] azureaiapp: Using Application ID: 2003
+2025-09-02 20:06:32,189 [DEBUG] azureaiapp: Using Application ID: 2003
+2025-09-02 20:06:41,965 [INFO] azureaiapp: Created table: AppDetails2003
+2025-09-02 20:06:41,965 [INFO] azureaiapp: Created table: AppDetails2003
+2025-09-02 20:06:41,969 [DEBUG] azureaiapp: Querying entities from template table: AppDetailsTemplate
+2025-09-02 20:06:41,969 [DEBUG] azureaiapp: Querying entities from template table: AppDetailsTemplate
+2025-09-02 20:06:43,979 [DEBUG] azureaiapp: Creating container '2003'
+2025-09-02 20:06:43,979 [DEBUG] azureaiapp: Creating container '2003'
+2025-09-02 20:07:26,962 [INFO] azureaiapp: Triggering indexing function for appId=2003, container=2003
+2025-09-02 20:07:26,962 [INFO] azureaiapp: Triggering indexing function for appId=2003, container=2003
+2025-09-02 20:07:26,962 [DEBUG] azureaiapp: Function URL: https://containerdataingestion-aqeaeah5a9h6czcq.westus-01.azurewebsites.net/api/index
+2025-09-02 20:07:26,962 [DEBUG] azureaiapp: Function URL: https://containerdataingestion-aqeaeah5a9h6czcq.westus-01.azurewebsites.net/api/index
+2025-09-02 20:08:28,386 [ERROR] azureaiapp: Failed to trigger indexing: 503, message='Attempt to decode JSON with unexpected mimetype: text/html', url='https://containerdataingestion-aqeaeah5a9h6czcq.westus-01.azurewebsites.net/api/index'
+2025-09-02 20:08:28,386 [ERROR] azureaiapp: Failed to trigger indexing: 503, message='Attempt to decode JSON with unexpected mimetype: text/html', url='https://containerdataingestion-aqeaeah5a9h6czcq.westus-01.azurewebsites.net/api/index'
+2025-09-02 20:11:13,121 [DEBUG] azureaiapp: Verbose logging enabled (APP_VERBOSE=true)
+2025-09-02 20:11:13,121 [DEBUG] azureaiapp: Verbose logging enabled (APP_VERBOSE=true)
+2025-09-02 20:11:13,127 [DEBUG] azureaiapp: Initializing SK AzureAIAgent and credentials
+2025-09-02 20:11:13,127 [DEBUG] azureaiapp: Initializing SK AzureAIAgent and credentials
+2025-09-02 20:11:15,989 [DEBUG] azureaiapp: Resolving AzureAIAgentSettings
+2025-09-02 20:11:15,989 [DEBUG] azureaiapp: Resolving AzureAIAgentSettings
+2025-09-02 20:11:15,993 [DEBUG] azureaiapp: Resolved endpoint=https://migrate-assessment-westus-003.services.ai.azure.com/api/projects/MigrateAssessmentProject, deployment=gpt-4.1
+2025-09-02 20:11:15,993 [DEBUG] azureaiapp: Resolved endpoint=https://migrate-assessment-westus-003.services.ai.azure.com/api/projects/MigrateAssessmentProject, deployment=gpt-4.1
+2025-09-02 20:11:18,320 [DEBUG] azureaiapp: Using Application ID: 2005
+2025-09-02 20:11:18,320 [DEBUG] azureaiapp: Using Application ID: 2005
+2025-09-02 20:11:24,733 [INFO] azureaiapp: Created table: AppDetails2005
+2025-09-02 20:11:24,733 [INFO] azureaiapp: Created table: AppDetails2005
+2025-09-02 20:11:24,733 [DEBUG] azureaiapp: Querying entities from template table: AppDetailsTemplate
+2025-09-02 20:11:24,733 [DEBUG] azureaiapp: Querying entities from template table: AppDetailsTemplate
+2025-09-02 20:11:29,016 [DEBUG] azureaiapp: Creating container '2005'
+2025-09-02 20:11:29,016 [DEBUG] azureaiapp: Creating container '2005'
+2025-09-02 21:20:11,212 [DEBUG] azureaiapp: Verbose logging enabled (APP_VERBOSE=true)
+2025-09-02 21:20:11,212 [DEBUG] azureaiapp: Verbose logging enabled (APP_VERBOSE=true)
+2025-09-02 21:20:11,216 [DEBUG] azureaiapp: Initializing SK AzureAIAgent and credentials
+2025-09-02 21:20:11,216 [DEBUG] azureaiapp: Initializing SK AzureAIAgent and credentials
+2025-09-02 21:20:13,585 [DEBUG] azureaiapp: Resolving AzureAIAgentSettings
+2025-09-02 21:20:13,585 [DEBUG] azureaiapp: Resolving AzureAIAgentSettings
+2025-09-02 21:20:13,589 [DEBUG] azureaiapp: Resolved endpoint=https://migrate-assessment-westus-003.services.ai.azure.com/api/projects/MigrateAssessmentProject, deployment=gpt-4.1
+2025-09-02 21:20:13,589 [DEBUG] azureaiapp: Resolved endpoint=https://migrate-assessment-westus-003.services.ai.azure.com/api/projects/MigrateAssessmentProject, deployment=gpt-4.1
+2025-09-02 21:20:45,907 [DEBUG] azureaiapp: Using Application ID: 200
+2025-09-02 21:20:45,907 [DEBUG] azureaiapp: Using Application ID: 200
+2025-09-02 21:20:53,505 [INFO] azureaiapp: Created table: AppDetails200
+2025-09-02 21:20:53,505 [INFO] azureaiapp: Created table: AppDetails200
+2025-09-02 21:20:53,506 [DEBUG] azureaiapp: Querying entities from template table: AppDetailsTemplate
+2025-09-02 21:20:53,506 [DEBUG] azureaiapp: Querying entities from template table: AppDetailsTemplate
+2025-09-02 21:20:56,636 [DEBUG] azureaiapp: Creating container '200'
+2025-09-02 21:20:56,636 [DEBUG] azureaiapp: Creating container '200'
+2025-09-02 21:22:02,587 [INFO] azureaiapp: Triggering indexing function for appId=200, container=200
+2025-09-02 21:22:02,587 [INFO] azureaiapp: Triggering indexing function for appId=200, container=200
+2025-09-02 21:22:02,587 [DEBUG] azureaiapp: Function URL: https://containerdataingestion-aqeaeah5a9h6czcq.westus-01.azurewebsites.net/api/index
+2025-09-02 21:22:02,587 [DEBUG] azureaiapp: Function URL: https://containerdataingestion-aqeaeah5a9h6czcq.westus-01.azurewebsites.net/api/index
+2025-09-02 21:22:12,371 [DEBUG] azureaiapp: Indexing function response: {'status': 'ok', 'requestId': '7e507a8b-18d0-4ad7-be97-0c2d8d41f880', 'input': {'appId': '200', 'container': '200'}, 'result': {'mode': 'container', 'blobs': 4, 'chunks': 4, 'uploaded': 4, 'failed': 0}}
+2025-09-02 21:22:12,371 [DEBUG] azureaiapp: Indexing function response: {'status': 'ok', 'requestId': '7e507a8b-18d0-4ad7-be97-0c2d8d41f880', 'input': {'appId': '200', 'container': '200'}, 'result': {'mode': 'container', 'blobs': 4, 'chunks': 4, 'uploaded': 4, 'failed': 0}}
+2025-09-02 21:22:14,083 [INFO] azureaiapp: Indexing successful: 4 documents uploaded
+2025-09-02 21:22:14,083 [INFO] azureaiapp: Indexing successful: 4 documents uploaded
+2025-09-02 21:22:27,167 [INFO] azureaiapp: Configured Azure AI Search tool with index 'mgassessearch' (query_type=SIMPLE)
+2025-09-02 21:22:27,167 [INFO] azureaiapp: Configured Azure AI Search tool with index 'mgassessearch' (query_type=SIMPLE)
+2025-09-02 21:22:27,167 [INFO] azureaiapp: Creating new agent
+2025-09-02 21:22:27,167 [INFO] azureaiapp: Creating new agent
+2025-09-02 21:22:27,814 [INFO] azureaiapp: Created agent, ID: asst_Mb6ilqvXqy1khKQpJ6oCTRdo
+2025-09-02 21:22:27,814 [INFO] azureaiapp: Created agent, ID: asst_Mb6ilqvXqy1khKQpJ6oCTRdo
+2025-09-02 21:22:35,737 [DEBUG] azureaiapp: Agent response for 'Application ID...': {
+  "Response": "",
+  "Confidence": 0,
+  "Citation": ""
+}
+2025-09-02 21:22:35,737 [DEBUG] azureaiapp: Agent response for 'Application ID...': {
+  "Response": "",
+  "Confidence": 0,
+  "Citation": ""
+}
+2025-09-02 21:22:41,552 [DEBUG] azureaiapp: Agent response for 'Application name...': {
+  "Response": "",
+  "Citation": "",
+  "Confidence": 0
+}
+2025-09-02 21:22:41,552 [DEBUG] azureaiapp: Agent response for 'Application name...': {
+  "Response": "",
+  "Citation": "",
+  "Confidence": 0
+}
+2025-09-02 21:22:47,505 [DEBUG] azureaiapp: Agent response for 'Description...': {
+  "Response": "",
+  "Citation": "",
+  "Confidence": 0
+}
+2025-09-02 21:22:47,505 [DEBUG] azureaiapp: Agent response for 'Description...': {
+  "Response": "",
+  "Citation": "",
+  "Confidence": 0
+}
+2025-09-02 21:22:54,732 [DEBUG] azureaiapp: Agent response for 'Application Owner...': {
+  "Response": "An Application Owner is typically responsible for overseeing the management, maintenance, and lifecycle of a specific application within an organization. This includes ensuring the ap
+2025-09-02 21:22:54,732 [DEBUG] azureaiapp: Agent response for 'Application Owner...': {
+  "Response": "An Application Owner is typically responsible for overseeing the management, maintenance, and lifecycle of a specific application within an organization. This includes ensuring the ap
+2025-09-02 21:23:01,640 [DEBUG] azureaiapp: Agent response for 'Application Business Owner...': {
+  "Response": "The term 'Application Business Owner' refers to the individual responsible for the overall business outcome and value delivered by a specific application within an organization. This 
+2025-09-02 21:23:01,640 [DEBUG] azureaiapp: Agent response for 'Application Business Owner...': {
+  "Response": "The term 'Application Business Owner' refers to the individual responsible for the overall business outcome and value delivered by a specific application within an organization. This 

@@ -1,0 +1,133 @@
+openapi: 3.1.0
+info:
+  title: Terraform Analysis Tools API
+  version: 1.0.0
+  description: API for analyzing GitHub repositories and generating Terraform plans
+servers:
+  - url: https://terraform-analyzer-functionapp.azurewebsites.net/api
+paths:
+  /github-fetcher:
+    post:
+      operationId: fetchGitHubRepository
+      summary: Fetch and analyze a GitHub repository for Terraform files
+      parameters:
+        - name: code
+          in: query
+          required: true
+          description: Azure Function key (injected at agent creation)
+          schema:
+            type: string
+            default: REPLACE_WITH_FUNCTION_KEY
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [github_url]
+              properties:
+                github_url:
+                  type: string
+                  description: The GitHub repository URL
+                  example: https://github.com/user/terraform-repo
+      responses:
+        '200':
+          description: Repository fetched successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [success, failed]
+                  repo_id:
+                    type: string
+                  terraform_files:
+                    type: array
+                    items:
+                      type: string
+                  terraform_directories:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        path:
+                          type: string
+                        tf_count:
+                          type: integer
+                  total_files:
+                    type: integer
+                  terraform_installed:
+                    type: boolean
+        '400':
+          description: Bad request
+        '500':
+          description: Internal server error
+
+  /terraform-analyze:
+    post:
+      operationId: generateTerraformPlan
+      summary: Generate actual Terraform plan using terraform binary
+      parameters:
+        - name: code
+          in: query
+          required: true
+          description: Azure Function key (injected at agent creation)
+          schema:
+            type: string
+            default: REPLACE_WITH_FUNCTION_KEY
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [repo_id]
+              properties:
+                repo_id:
+                  type: string
+                  description: The repository ID from github-fetcher
+                target_directory:
+                  type: string
+                  description: Target directory containing Terraform files
+                tfvars_content:
+                  type: string
+                variable_overrides:
+                  type: object
+                  additionalProperties:
+                    type: string
+      responses:
+        '200':
+          description: Plan generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [success, failed]
+                  terraform_json_url:
+                    type: string
+                  terraform_json:
+                    type: object
+                  summary:
+                    type: object
+                    properties:
+                      total_resources:
+                        type: integer
+                      resource_types:
+                        type: object
+                        additionalProperties:
+                          type: integer
+                      resource_changes:
+                        type: integer
+                  message:
+                    type: string
+                  terraform_version:
+                    type: string
+        '400':
+          description: Bad request
+        '500':
+          description: Internal server error

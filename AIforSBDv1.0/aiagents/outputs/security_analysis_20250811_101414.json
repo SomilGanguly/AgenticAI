@@ -1,0 +1,55 @@
+{
+  "security_gaps": [
+    {
+      "resource_type": "azurerm_key_vault",
+      "resource_name": "main",
+      "security_issue": "Public network access is enabled.",
+      "severity": "high",
+      "baseline_reference": "Disable public network access for Key Vaults.",
+      "recommendation": "Disable public network access and configure firewall rules.",
+      "terraform_fix": "\"public_network_access_enabled\": false"
+    },
+    {
+      "resource_type": "azurerm_key_vault",
+      "resource_name": "main",
+      "security_issue": "Purge protection is disabled.",
+      "severity": "high",
+      "baseline_reference": "Enable purge protection to prevent accidental or malicious deletion.",
+      "recommendation": "Enable purge protection.",
+      "terraform_fix": "\"purge_protection_enabled\": true"
+    },
+    {
+      "resource_type": "azurerm_linux_web_app",
+      "resource_name": "main",
+      "security_issue": "Minimum TLS version is set to 1.0.",
+      "severity": "high",
+      "baseline_reference": "Minimum TLS version should be 1.2 for secure data transfer.",
+      "recommendation": "Set TLS version to 1.2 or higher.",
+      "terraform_fix": "\"site_config\": [{\"minimum_tls_version\": \"1.2\"}]"
+    },
+    {
+      "resource_type": "azurerm_linux_web_app",
+      "resource_name": "main",
+      "security_issue": "FTP and Webdeploy authentication are enabled.",
+      "severity": "medium",
+      "baseline_reference": "Disable FTP and webdeploy authentication for secure access.",
+      "recommendation": "Disable FTP and Webdeploy authentication.",
+      "terraform_fix": "\"ftp_publish_basic_authentication_enabled\": false, \"webdeploy_publish_basic_authentication_enabled\": false"
+    },
+    {
+      "resource_type": "azurerm_mssql_database",
+      "resource_name": "main",
+      "security_issue": "Key rotation for Transparent Data Encryption (TDE) is not automated.",
+      "severity": "medium",
+      "baseline_reference": "Automate key rotation for TDE to enhance security.",
+      "recommendation": "Configure automatic key rotation for TDE.",
+      "terraform_fix": "\"transparent_data_encryption_key_automatic_rotation_enabled\": true"
+    }
+  ],
+  "summary": {
+    "total_issues": 5,
+    "high_severity": 3,
+    "medium_severity": 2,
+    "low_severity": 0
+  }
+}

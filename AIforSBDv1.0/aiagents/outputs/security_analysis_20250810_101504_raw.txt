@@ -1,0 +1,74 @@
+import json
+
+# Parse the Terraform configuration as JSON
+terraform_data = json.loads(terraform_config)
+
+# Initialize lists to capture security issues
+security_gaps = []
+
+# Extract resources for analysis
+resources = terraform_data.get("planned_values", {}).get("root_module", {}).get("resources", [])
+
+# Analyze each resource
+for resource in resources:
+    resource_type = resource.get("type")
+    resource_name = resource.get("name")
+    values = resource.get("values", {})
+
+    if resource_type == "azurerm_key_vault":
+        # Analyze Azure Key Vault security configurations
+        network_acls = values.get("network_acls", [])
+        
+        # Check for default 'Allow' action in network ACLs
+        for acl in network_acls:
+            if acl.get("default_action") == "Allow" and acl.get("bypass") == "AzureServices":
+                security_gaps.append({
+                    "resource_type": resource_type,
+                    "resource_name": resource_name,
+                    "security_issue": "Network ACL allows 'AzureServices' bypass with default allow action.",
+                    "severity": "high",
+                    "baseline_reference": "SCF-SEC-03-01 Cloud Workload Protection Platform",
+                    "recommendation": "Restrict access by configuring IP rules or virtual network constraints.",
+                    "terraform_fix": 'Update "network_acls" to specify proper restrictions.'
+                })
+
+        # Check if RBAC authorization is disabled
+        if not values.get("enable_rbac_authorization"):
+            security_gaps.append({
+                "resource_type": resource_type,
+                "resource_name": resource_name,
+                "security_issue": "RBAC authorization is not explicitly enabled for the Key Vault.",
+                "severity": "medium",
+                "baseline_reference": "SCF-RES-01-02 Enable least privilege on the control plane.",
+                "recommendation": "Enable RBAC authorization for fine-grained access control.",
+                "terraform_fix": 'Set "enable_rbac_authorization" to true in the Key Vault configuration.'
+            })
+
+# Analyze variables for sensitive plain text values
+for var_name, var_details in terraform_data.get("variables", {}).items():
+    if "password" in var_name.lower() and isinstance(var_details.get("value"), str):
+        security_gaps.append({
+            "resource_type": "variable",
+            "resource_name": var_name,
+            "security_issue": "Sensitive variable contains plaintext password.",
+            "severity": "high",
+            "baseline_reference": "SCF-RES-01-05 Detect exposed secrets in deployments.",
+            "recommendation": "Store sensitive values in Azure Key Vault and reference them securely.",
+            "terraform_fix": f'Store "{var_name}" in Azure Key Vault and use "azurerm_key_vault_secret" to retrieve it.'
+        })
+
+# Summarize security issues by severity levels
+summary = {
+    "total_issues": len(security_gaps),
+    "high_severity": sum(1 for gap in security_gaps if gap["severity"] == "high"),
+    "medium_severity": sum(1 for gap in security_gaps if gap["severity"] == "medium"),
+    "low_severity": sum(1 for gap in security_gaps if gap["severity"] == "low"),
+}
+
+# Final JSON output
+output = {
+    "security_gaps": security_gaps,
+    "summary": summary
+}
+
+output

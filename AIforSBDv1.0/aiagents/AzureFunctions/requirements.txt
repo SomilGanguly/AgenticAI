@@ -1,0 +1,6 @@
+azure-functions
+GitPython
+azure-storage-blob
+azure-identity
+python-hcl2
+pyyaml

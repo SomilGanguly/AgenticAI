@@ -1,0 +1,81 @@
+import json
+
+# Parse the Terraform content as JSON for analysis
+parsed_terraform_config = json.loads(terraform_config)
+
+# Initialize the list for storing security issues and misconfigurations found
+security_gaps = []
+
+# Helper function to add security issues
+def add_security_issue(resource_type, resource_name, security_issue, severity, baseline_reference, recommendation, terraform_fix):
+    security_gaps.append({
+        "resource_type": resource_type,
+        "resource_name": resource_name,
+        "security_issue": security_issue,
+        "severity": severity,
+        "baseline_reference": baseline_reference,
+        "recommendation": recommendation,
+        "terraform_fix": terraform_fix
+    })
+
+# Analyze resources and configurations
+resources = parsed_terraform_config.get("planned_values", {}).get("root_module", {}).get("resources", [])
+for resource in resources:
+    if resource["type"] == "azurerm_key_vault":
+        name = resource["name"]
+        values = resource["values"]
+        
+        # Issue 1: RBAC Authorization not enabled
+        if not values.get("enable_rbac_authorization"):
+            add_security_issue(
+                resource_type="azurerm_key_vault",
+                resource_name=name,
+                security_issue="RBAC Authorization is not enabled for Key Vault",
+                severity="high",
+                baseline_reference="SCF-RES-01-01",
+                recommendation="Enable RBAC Authorization for stricter access control.",
+                terraform_fix='set "enable_rbac_authorization" to true in azurerm_key_vault resource configuration.'
+            )
+        
+        # Issue 2: Network ACL allows bypass
+        network_acls = values.get("network_acls", [])
+        for acl in network_acls:
+            if acl.get("bypass") == "AzureServices":
+                add_security_issue(
+                    resource_type="azurerm_key_vault",
+                    resource_name=name,
+                    security_issue="Key Vault network ACL allows bypass for Azure Services (potential exposure risk).",
+                    severity="medium",
+                    baseline_reference="SCF-SEC-03",
+                    recommendation="Restrict bypass for network ACLs or limit IP rules.",
+                    terraform_fix='Replace "bypass" value with "None" or add specific IP Rules in network ACL configuration.'
+                )
+
+# Issue 3: Plaintext password in variables
+for variable, details in parsed_terraform_config.get("variables", {}).items():
+    if "password" in variable.lower():
+        add_security_issue(
+            resource_type="variable",
+            resource_name=variable,
+            security_issue="Potential plaintext password found in variables.",
+            severity="high",
+            baseline_reference="SCF-RES-01-05",
+            recommendation="Remove plaintext passwords from Terraform files and use secure parameter stores.",
+            terraform_fix="Store passwords in Azure Key Vault or a secure secrets store and reference them securely."
+        )
+
+# Returning the summarized results
+security_gaps_summary = {
+    "total_issues": len(security_gaps),
+    "high_severity": sum(1 for gap in security_gaps if gap["severity"] == "high"),
+    "medium_severity": sum(1 for gap in security_gaps if gap["severity"] == "medium"),
+    "low_severity": sum(1 for gap in security_gaps if gap["severity"] == "low"),
+}
+
+# Prepare final JSON structure
+security_analysis_report = {
+    "security_gaps": security_gaps,
+    "summary": security_gaps_summary
+}
+
+security_analysis_report

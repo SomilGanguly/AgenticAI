@@ -1,0 +1,10 @@
+azure-ai-projects>=1.0.0b8
+azure-ai-agents>=1.0.0b2
+azure-identity>=1.16.0
+python-dotenv>=1.0.1
+azure-search-documents>=11.6.0b12
+semantic-kernel>=1.16.0
+azure-storage-blob>=12.20.0
+azure-data-tables>=12.5.0
+aiohttp>=3.9.0
+

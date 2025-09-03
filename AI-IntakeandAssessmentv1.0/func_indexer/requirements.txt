@@ -1,0 +1,11 @@
+azure-functions
+azure-search-documents>=11.5.0
+azure-storage-blob
+azure-identity
+python-docx
+pypdf
+pandas
+openpyxl
+numpy
+tenacity
+openai
