@@ -1,4 +1,4 @@
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Set
 
 import argparse
 import json
@@ -79,7 +79,7 @@ async def trigger_indexing_function(app_id: str, container_name: str) -> Dict[st
             return result
 
 
-async def chat_loop(orchestrator_name: str, application_id: Optional[str] = None) -> None:
+async def chat_loop(orchestrator_name: str, application_id: Optional[str] = None, cleanup: bool = True) -> None:
     """Interactive chat using Semantic Kernel AzureAIAgent, with /create fallback."""
     logger.debug("Initializing SK AzureAIAgent and credentials")
     try:
@@ -133,6 +133,10 @@ async def chat_loop(orchestrator_name: str, application_id: Optional[str] = None
     last_answer_thread_id: Optional[str] = None
     # Track low confidence questions for interactive resolution
     low_confidence_questions: List[Dict[str, Any]] = []
+    # Track ephemeral threads created via direct AIProjectClient usage
+    ephemeral_thread_ids: Set[str] = set()
+    # Track any answer (intake) agent IDs created/retrieved so we can optionally clean them up
+    answer_agent_ids: Set[str] = set()
 
     class OrchestratorPlugin:
         @kernel_function(description="Check if an Azure AI Search index exists for this application.")
@@ -146,80 +150,42 @@ async def chat_loop(orchestrator_name: str, application_id: Optional[str] = None
         @kernel_function(description="Ensure an Azure Blob Storage container exists (create if missing). Uses AZURE_STORAGE_CONNECTION_STRING or DefaultAzureCredential with AZURE_STORAGE_ACCOUNT_URL.")
         def check_container_exists(self, container_name: Optional[str] = None, account_url: Optional[str] = None) -> str:
             try:
-                if not container_name:
-                    container_name = application_id
+                container = container_name or application_id
+                from azure.storage.blob import BlobServiceClient
                 conn_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
                 if conn_str:
-                    try:
-                        from azure.storage.blob import BlobServiceClient
-                        bsc = BlobServiceClient.from_connection_string(conn_str)
-                    except Exception as ex:
-                        return json.dumps({"result": "error", "message": f"BlobServiceClient init failed: {ex}"})
+                    bsc = BlobServiceClient.from_connection_string(conn_str)
                 else:
-                    try:
-                        from azure.storage.blob import BlobServiceClient
-                        from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
-                        acct_url = account_url or os.getenv("AZURE_STORAGE_ACCOUNT_URL")
-                        if not acct_url:
-                            return json.dumps({"result": "unverified", "reason": "Missing AZURE_STORAGE_ACCOUNT_URL"})
-                        cred = SyncDefaultAzureCredential(exclude_shared_token_cache_credential=True)
-                        bsc = BlobServiceClient(account_url=acct_url, credential=cred)
-                    except Exception as ex:
-                        return json.dumps({"result": "error", "message": f"BlobServiceClient init failed: {ex}"})
-
+                    from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
+                    acct_url = account_url or os.getenv("AZURE_STORAGE_ACCOUNT_URL")
+                    if not acct_url:
+                        return json.dumps({"result": "unverified", "reason": "Missing AZURE_STORAGE_ACCOUNT_URL"})
+                    cred = SyncDefaultAzureCredential(exclude_shared_token_cache_credential=True)
+                    bsc = BlobServiceClient(account_url=acct_url, credential=cred)
+                cc = bsc.get_container_client(container)
                 try:
-                    cc = bsc.get_container_client(container_name)
-                    try:
-                        cc.get_container_properties()
-                        return json.dumps({
-                            "container": container_name,
-                            "exists": True,
-                            "created": False,
-                            "url": getattr(cc, "url", None),
-                        })
-                    except Exception as ex:
-                        # Create the container if it does not exist
-                        if ex.__class__.__name__ in {"ResourceNotFoundError", "ResourceNotFound"}:
-                            try:
-                                logger.debug(f"Creating container '{container_name}'")
-                                cc.create_container()
-                                return json.dumps({
-                                    "container": container_name,
-                                    "exists": True,
-                                    "created": True,
-                                    "url": getattr(cc, "url", None),
-                                    "message": f"Container '{container_name}' created. Please upload your files to this container to proceed.",
-                                })
-                            except Exception as create_ex:
-                                # If already created by race, treat as exists
-                                if "ContainerAlreadyExists" in str(create_ex):
-                                    return json.dumps({
-                                        "container": container_name,
-                                        "exists": True,
-                                        "created": False,
-                                        "url": getattr(cc, "url", None),
-                                    })
-                                return json.dumps({"result": "error", "message": f"Create container failed: {create_ex}"})
-                        # Other errors
-                        return json.dumps({"result": "unverified", "message": str(ex)})
+                    cc.get_container_properties()
+                    return json.dumps({"container": container, "exists": True, "created": False, "url": getattr(cc, "url", None)})
                 except Exception as ex:
-                    return json.dumps({"result": "error", "message": str(ex)})
+                    if ex.__class__.__name__ in {"ResourceNotFoundError", "ResourceNotFound"}:
+                        try:
+                            cc.create_container()
+                            return json.dumps({"container": container, "exists": True, "created": True, "url": getattr(cc, "url", None), "message": f"Container '{container}' created. Please upload your files."})
+                        except Exception as cex:
+                            if "ContainerAlreadyExists" in str(cex):
+                                return json.dumps({"container": container, "exists": True, "created": False, "url": getattr(cc, "url", None)})
+                            return json.dumps({"result": "error", "message": f"Create container failed: {cex}"})
+                    return json.dumps({"result": "unverified", "message": str(ex)})
             except Exception as ex:
                 return json.dumps({"result": "error", "message": str(ex)})
 
         @kernel_function(description="Clone template table to create app-specific QA table. Copies all questions from template.")
         def clone_template_table(self, template_table: Optional[str] = None, target_table: Optional[str] = None) -> str:
-            """Clone template table with questions to create app-specific table."""
             try:
                 template = template_table or os.getenv("AZURE_QA_TEMPLATE_TABLE", "AppDetailsTemplate")
                 target = target_table or f"AppDetails{application_id}"
-                
+                from azure.data.tables import TableServiceClient
                 conn_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
-                try:
-                    from azure.data.tables import TableServiceClient
-                except Exception as ex:
-                    return json.dumps({"result": "error", "message": f"TableServiceClient import failed: {ex}"})
-                
                 if conn_str:
                     tsc = TableServiceClient.from_connection_string(conn_str)
                 else:
@@ -229,134 +195,58 @@ async def chat_loop(orchestrator_name: str, application_id: Optional[str] = None
                         return json.dumps({"result": "error", "reason": "Missing AZURE_TABLES_ACCOUNT_URL"})
                     cred = SyncDefaultAzureCredential(exclude_shared_token_cache_credential=True)
                     tsc = TableServiceClient(endpoint=tables_url, credential=cred)
-                
-                # Check if target table already exists
-                table_exists = False
                 try:
-                    existing_tables = [t.name for t in tsc.list_tables()]
-                    if target in existing_tables:
-                        table_exists = True
-                except Exception as ex:
-                    logger.warning(f"Failed to list tables: {ex}")
-                    # Try alternative check
-                    try:
-                        tc_target = tsc.get_table_client(table_name=target)
-                        # Try a simple operation to check existence
+                    existing = [t.name for t in tsc.list_tables()]
+                    if target in existing:
+                        tc_target = tsc.get_table_client(target)
                         try:
-                            # Query with no results expected - if table doesn't exist, this will raise an error
-                            next(tc_target.query_entities(max_page_size=1), None)
-                            table_exists = True
-                        except StopIteration:
-                            # Empty table but exists
-                            table_exists = True
-                    except Exception as inner_ex:
-                        if "TableNotFound" in str(inner_ex) or "ResourceNotFound" in str(inner_ex) or "404" in str(inner_ex):
-                            table_exists = False
-                        else:
-                            logger.debug(f"Could not determine table existence: {inner_ex}")
-                            table_exists = False
-                
-                if table_exists:
-                    # Check if table has data already
-                    tc_target = tsc.get_table_client(table_name=target)
-                    try:
-                        existing_count = sum(1 for _ in tc_target.query_entities(max_page_size=1000))
-                        if existing_count > 0:
-                            return json.dumps({
-                                "result": "exists", 
-                                "table": target, 
-                                "message": f"Table already exists with {existing_count} rows"
-                            })
-                    except Exception:
-                        pass
-                    return json.dumps({"result": "exists", "table": target, "message": "Table already exists"})
-                
-                # Create the target table
+                            existing_count = sum(1 for _ in tc_target.query_entities(max_page_size=1000))
+                        except Exception:
+                            existing_count = 0
+                        return json.dumps({"result": "exists", "table": target, "message": f"Table already exists with {existing_count} rows"})
+                except Exception:
+                    pass
                 try:
-                    tsc.create_table(table_name=target)
-                    logger.debug(f"Created table: {target}")
+                    tsc.create_table(target)
                 except Exception as e:
-                    if "TableAlreadyExists" in str(e) or "AlreadyExists" in str(e):
-                        logger.debug(f"Table {target} already exists (race condition)")
-                    else:
+                    if "AlreadyExists" not in str(e):
                         return json.dumps({"result": "error", "message": f"Create table failed: {e}"})
-                
-                # Get table clients
-                tc_template = tsc.get_table_client(table_name=template)
-                tc_target = tsc.get_table_client(table_name=target)
-                
+                tc_template = tsc.get_table_client(template)
+                tc_target = tsc.get_table_client(target)
                 copied = 0
-                try:
-                    # Query all entities from template - use list() to get all entities
-                    logger.debug(f"Querying entities from template table: {template}")
-                    
-                    # Use list() to query all entities from the template
-                    template_entities = list(tc_template.list_entities())
-                    
-                    for entity in template_entities:
-                        # Create new entity with updated PartitionKey
-                        new_entity = {
-                            "PartitionKey": application_id,
-                            "RowKey": entity.get("RowKey", f"Q{copied+1:03d}"),
-                            "Question": entity.get("Question", ""),
-                            "Guidance": entity.get("Guidance", ""),
-                            "Response": "",  # Empty initially
-                            "Confidence": 0.0,  # Default to 0
-                            "Citation": ""  # Empty initially
-                        }
-                        
-                        # Only copy if Question field has content
-                        if new_entity["Question"]:
-                            tc_target.upsert_entity(entity=new_entity)
-                            copied += 1
-                    
-                    if copied == 0:
-                        logger.warning(f"No entities found in template table: {template}")
-                        return json.dumps({
-                            "result": "warning",
-                            "template": template,
-                            "target": target,
-                            "copied": 0,
-                            "message": f"Created table '{target}' but template '{template}' had no questions to copy"
-                        })
-                    
-                    return json.dumps({
-                        "result": "ok",
-                        "template": template,
-                        "target": target,
-                        "copied": copied,
-                        "message": f"Created table '{target}' with {copied} questions from template"
-                    })
-                    
-                except Exception as ex:
-                    error_msg = str(ex)
-                    if "TableNotFound" in error_msg or "ResourceNotFound" in error_msg:
-                        return json.dumps({
-                            "result": "error", 
-                            "message": f"Template table '{template}' not found. Please ensure it exists with questions."
-                        })
-                    return json.dumps({"result": "error", "message": f"Copy failed: {ex}"})
-                    
+                for ent in tc_template.list_entities():
+                    new_e = {
+                        "PartitionKey": application_id,
+                        "RowKey": ent.get("RowKey", f"Q{copied+1:03d}"),
+                        "Question": ent.get("Question", ""),
+                        "Guidance": ent.get("Guidance", ""),
+                        "Response": "",
+                        "Confidence": 0.0,
+                        "Citation": ""
+                    }
+                    if new_e["Question"]:
+                        tc_target.upsert_entity(new_e)
+                        copied += 1
+                if copied == 0:
+                    return json.dumps({"result": "warning", "template": template, "target": target, "copied": 0, "message": "Template had no questions"})
+                return json.dumps({"result": "ok", "template": template, "target": target, "copied": copied})
             except Exception as ex:
                 return json.dumps({"result": "error", "message": str(ex)})
 
         @kernel_function(description="Clone multiple template tables for application setup.")
         def clone_all_templates(self, templates: Optional[List[str]] = None) -> str:
-            """Clone all required template tables for the application."""
             try:
                 default_templates = [
                     "AppDetailsTemplate",
-                    "PrivacyAndSecurity", 
-                    "IntegrationDependencyTemplate"
+                    "PrivacyAndSecurity",
+                    "IntegrationDependencyTemplate",
+                    "MsSqlDBTemplate",
+                    "OracleDBTemplate",
+                    "InfrastructureDetails"
                 ]
                 templates_to_clone = templates or default_templates
-                
+                from azure.data.tables import TableServiceClient
                 conn_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
-                try:
-                    from azure.data.tables import TableServiceClient
-                except Exception as ex:
-                    return json.dumps({"result": "error", "message": f"TableServiceClient import failed: {ex}"})
-                
                 if conn_str:
                     tsc = TableServiceClient.from_connection_string(conn_str)
                 else:
@@ -366,65 +256,52 @@ async def chat_loop(orchestrator_name: str, application_id: Optional[str] = None
                         return json.dumps({"result": "error", "message": "Missing AZURE_TABLES_ACCOUNT_URL"})
                     cred = SyncDefaultAzureCredential(exclude_shared_token_cache_credential=True)
                     tsc = TableServiceClient(endpoint=tables_url, credential=cred)
-                
                 results = {}
                 for template in templates_to_clone:
-                    # Determine target table name based on template
                     if "AppDetails" in template:
                         target = f"AppDetails{application_id}"
                     elif "PrivacyAndSecurity" in template:
                         target = f"PrivacyAndSecurity{application_id}"
                     elif "IntegrationDependency" in template:
                         target = f"IntegrationDependency{application_id}"
+                    elif "MSSQLBD" in template or "MSSQLDB" in template:
+                        target = f"MSSQLDB{application_id}"
+                    elif "OracleDB" in template:
+                        target = f"OracleDB{application_id}"
+                    elif "InfrastructureDetails" in template:
+                        target = f"InfrastructureDetails{application_id}"
                     else:
-                        target = f"{template.replace('Template', '')}{application_id}"
-                    
-                    # Clone the template
-                    result = self._clone_single_template(tsc, template, target, application_id)
-                    results[template] = result
-                
+                        target = f"{template.replace('Template','')}{application_id}"
+                    results[template] = self._clone_single_template(tsc, template, target, application_id)
                 return json.dumps({"result": "ok", "cloned": results})
-                
             except Exception as ex:
                 return json.dumps({"result": "error", "message": str(ex)})
 
         def _clone_single_template(self, tsc, template: str, target: str, app_id: str) -> dict:
-            """Helper to clone a single template table."""
             try:
-                # Check if target exists
                 try:
-                    tc_target = tsc.get_table_client(table_name=target)
+                    tc_target = tsc.get_table_client(target)
                     existing_count = sum(1 for _ in tc_target.query_entities(max_page_size=1))
                     if existing_count > 0:
                         return {"status": "exists", "table": target, "rows": existing_count}
-                except:
+                except Exception:
                     pass
-                
-                # Create target table
                 try:
-                    tsc.create_table(table_name=target)
+                    tsc.create_table(target)
                 except Exception as e:
-                    if "TableAlreadyExists" not in str(e):
-                        logger.warning(f"Create table warning: {e}")
-                
-                # Copy entities
-                tc_template = tsc.get_table_client(table_name=template)
-                tc_target = tsc.get_table_client(table_name=target)
-                
+                    if "AlreadyExists" not in str(e):
+                        logger.debug(f"Create table warning: {e}")
+                tc_template = tsc.get_table_client(template)
+                tc_target = tsc.get_table_client(target)
                 copied = 0
-                for entity in tc_template.list_entities():
-                    # Update PartitionKey to application_id
-                    entity["PartitionKey"] = app_id
-                    # Ensure required fields exist
-                    if "Response" not in entity:
-                        entity["Response"] = ""
-                    if "Confidence" not in entity:
-                        entity["Confidence"] = 0.0
-                    if "Citation" not in entity:
-                        entity["Citation"] = ""
-                    tc_target.upsert_entity(entity=entity)
+                for ent in tc_template.list_entities():
+                    ent["PartitionKey"] = app_id
+                    if template not in ["IntegrationDependencyTemplate", "InfrastructureDetailsTemplate"]:
+                        ent.setdefault("Response", "")
+                        ent.setdefault("Confidence", 0.0)
+                        ent.setdefault("Citation", "")
+                    tc_target.upsert_entity(ent)
                     copied += 1
-                
                 return {"status": "created", "table": target, "copied": copied}
             except Exception as ex:
                 return {"status": "error", "message": str(ex)}
@@ -638,6 +515,10 @@ async def chat_loop(orchestrator_name: str, application_id: Optional[str] = None
                     async with AIProjectClient(credential=creds, endpoint=endpoint) as ai_client:
                         # Create a thread for this query
                         thread = await ai_client.agents.threads.create()
+                        try:
+                            ephemeral_thread_ids.add(thread.id)
+                        except Exception:
+                            pass
                         
                         # Send the query
                         await ai_client.agents.messages.create(
@@ -697,11 +578,11 @@ async def chat_loop(orchestrator_name: str, application_id: Optional[str] = None
                                         logger.error(f"Failed to parse server list from agent response: {parse_ex}")
                                         logger.debug(f"Response content: {content[:500]}")
                         
-                        # # Clean up thread
-                        # try:
-                        #     await ai_client.agents.threads.delete(thread_id=thread.id)
-                        # except:
-                        #     pass
+                        # Clean up thread explicitly
+                        try:
+                            await ai_client.agents.threads.delete(thread_id=thread.id)
+                        except Exception as _del_ex:
+                            logger.debug(f"Thread delete failed (unique servers): {_del_ex}")
                 
                 logger.warning("Could not extract server list from agent")
                 return []
@@ -709,7 +590,6 @@ async def chat_loop(orchestrator_name: str, application_id: Optional[str] = None
             except Exception as ex:
                 logger.error(f"Failed to get unique servers from agent: {ex}")
                 return []
-
         def _generate_dependency_query(self, server_name: str) -> str:
             """Generate a specialized query for extracting dependency information for a specific server."""
             return f"""Extract ALL network dependency information for server '{server_name}' from the indexed documents.
@@ -762,97 +642,63 @@ IMPORTANT:
         async def _query_dependencies_for_server(self, query: str, server_name: str, agent_id: str) -> List[Dict]:
             """Query the agent for dependency information about a specific server."""
             try:
-                # Get the answer agent
                 if not agent_id:
                     return []
-                
-                # Query the agent
                 from azure.ai.projects.aio import AIProjectClient
                 from azure.identity.aio import DefaultAzureCredential
-                
                 endpoint = os.environ.get("AZURE_EXISTING_AIPROJECT_ENDPOINT")
-                
                 async with DefaultAzureCredential(exclude_shared_token_cache_credential=True) as creds:
                     async with AIProjectClient(credential=creds, endpoint=endpoint) as ai_client:
-                        # Create a thread for this query
                         thread = await ai_client.agents.threads.create()
-                        
-                        # Send the query
-                        await ai_client.agents.messages.create(
-                            thread_id=thread.id,
-                            role="user",
-                            content=query
-                        )
-                        
-                        # Run and get response
-                        run = await ai_client.agents.runs.create(
-                            thread_id=thread.id,
-                            agent_id=agent_id
-                        )
-                        
-                        # Wait for completion
-                        import asyncio
-                        while run.status in ["queued", "in_progress", "requires_action"]:
-                            await asyncio.sleep(1)
-                            run = await ai_client.agents.runs.get(
-                                thread_id=thread.id,
-                                run_id=run.id
-                            )
-                        
-                        if run.status == "completed":
-                            # Get messages
-                            messages = ai_client.agents.messages.list(thread_id=thread.id)
-                            
-                            # Parse the assistant's response
-                            async for message in messages:
-                                if message.role == "assistant":
-                                    content = message.content[0].text.value if message.content else ""
-                                    
-                                    # Try to parse as JSON array
-                                    try:
-                                        import json
-                                        dependencies = json.loads(content)
-                                        if isinstance(dependencies, list):
-                                            return dependencies
-                                        elif isinstance(dependencies, dict) and "Response" in dependencies:
-                                            # Handle case where agent returns in Response/Confidence/Citation format
-                                            response_text = dependencies.get("Response", "")
-                                            try:
-                                                return json.loads(response_text)
-                                            except:
-                                                # Try to extract structured data from response
-                                                return self._parse_dependency_text(response_text, server_name)
-                                    except:
-                                        # Fallback parsing
-                                        return self._parse_dependency_text(content, server_name)
-                        
-                        # # Clean up
-                        # await ai_client.agents.threads.delete(thread_id=thread.id)
-                        
+                        try:
+                            ephemeral_thread_ids.add(thread.id)
+                        except Exception:
+                            pass
+                        try:
+                            await ai_client.agents.messages.create(thread_id=thread.id, role="user", content=query)
+                            run = await ai_client.agents.runs.create(thread_id=thread.id, agent_id=agent_id)
+                            import asyncio
+                            while run.status in ["queued", "in_progress", "requires_action"]:
+                                await asyncio.sleep(1)
+                                run = await ai_client.agents.runs.get(thread_id=thread.id, run_id=run.id)
+                            if run.status == "completed":
+                                messages = ai_client.agents.messages.list(thread_id=thread.id)
+                                async for message in messages:
+                                    if message.role == "assistant":
+                                        content = message.content[0].text.value if message.content else ""
+                                        try:
+                                            import json
+                                            dependencies = json.loads(content)
+                                            if isinstance(dependencies, list):
+                                                return dependencies
+                                            if isinstance(dependencies, dict) and "Response" in dependencies:
+                                                response_text = dependencies.get("Response", "")
+                                                try:
+                                                    return json.loads(response_text)
+                                                except Exception:
+                                                    return self._parse_dependency_text(response_text, server_name)
+                                        except Exception:
+                                            return self._parse_dependency_text(content, server_name)
+                        finally:
+                            try:
+                                await ai_client.agents.threads.delete(thread_id=thread.id)
+                            except Exception as _del_ex:
+                                logger.debug(f"Thread delete failed (dependency query {server_name}): {_del_ex}")
             except Exception as ex:
                 logger.error(f"Failed to query dependencies for {server_name}: {ex}")
-                return []
+            return []
 
         def _parse_dependency_text(self, text: str, server_name: str) -> List[Dict]:
             """Parse dependency information from text response."""
-            dependencies = []
-            
+            dependencies: List[Dict] = []
             import re
-            
-            # Try to parse table format with more specific patterns
             lines = text.split('\n')
-            
             for line in lines:
-                # Skip headers and empty lines
                 if 'Source' in line and 'Destination' in line:
                     continue
                 if not line.strip():
                     continue
-                
-                # Pattern for dependency table entries
-                # Example: POS System 192.168.50.10 API-GW-01 10.10.2.10 443/TCP Purpose
                 pattern = r'([^\d\s][^\t]*?)\s+([\d\.]+)\s+([^\d\s][^\t]*?)\s+([\d\.]+)\s+(\d+)/(TCP|UDP|HTTP|HTTPS)\s*(.*)?'
-                
                 match = re.match(pattern, line.strip(), re.IGNORECASE)
                 if match:
                     dependencies.append({
@@ -866,13 +712,9 @@ IMPORTANT:
                         "Confidence": 0.8,
                         "Citation": "Extracted from dependency table"
                     })
-            
-            # If no matches found with the table pattern, try simpler patterns
             if not dependencies:
-                # Pattern for "Source: X Destination: Y Port: Z" format
                 simple_pattern = r"Source[:\s]+([^\s,]+).*?Destination[:\s]+([^\s,]+).*?Port[:\s]+(\d+)"
                 matches = re.findall(simple_pattern, text, re.IGNORECASE | re.DOTALL)
-                
                 for match in matches:
                     dependencies.append({
                         "SourceHostname": match[0].strip(),
@@ -885,8 +727,193 @@ IMPORTANT:
                         "Confidence": 0.7,
                         "Citation": "Extracted from search results"
                     })
-            
             return dependencies
+
+        @kernel_function(description="Extract and populate infrastructure details for servers.")
+        async def populate_infrastructure_table(self, table_name: Optional[str] = None) -> str:
+            """Extract infrastructure information from search index and populate the table."""
+            try:
+                from azure.data.tables import TableServiceClient, UpdateMode as TableUpdateMode
+                from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
+                
+                infra_table = table_name or f"InfrastructureDetails{application_id}"
+                agent_id = await ensure_agent(application_id)
+                try:
+                    answer_agent_ids.add(agent_id)
+                except Exception:
+                    pass
+                
+                # Get table client
+                conn_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+                if conn_str:
+                    tsc = TableServiceClient.from_connection_string(conn_str)
+                else:
+                    tables_url = os.getenv("AZURE_TABLES_ACCOUNT_URL")
+                    if not tables_url:
+                        return json.dumps({"result": "error", "message": "Missing table storage config"})
+                    cred = SyncDefaultAzureCredential(exclude_shared_token_cache_credential=True)
+                    tsc = TableServiceClient(endpoint=tables_url, credential=cred)
+                
+                tc = tsc.get_table_client(table_name=infra_table)
+                
+                # Get unique servers from the search index (reuse existing method)
+                unique_servers = await self._get_unique_servers_from_index(agent_id)
+                
+                if not unique_servers:
+                    return json.dumps({"result": "warning", "message": "No server data found in index"})
+                
+                # Process each unique server
+                populated_count = 0
+                for server_name in unique_servers:
+                    # Generate specialized query for this server's infrastructure details
+                    infra_query = self._generate_infrastructure_query(server_name)
+                    
+                    # Get infrastructure information from the agent
+                    infra_info = await self._query_infrastructure_for_server(infra_query, server_name, agent_id)
+                    
+                    if infra_info and isinstance(infra_info, dict):
+                        # Create entity for table
+                        entity = {
+                            "PartitionKey": application_id,
+                            "RowKey": f"{server_name}_{populated_count}",
+                            "ApplicationName": application_id,
+                            "VMHostname": infra_info.get("VMHostname", server_name),
+                            "Domain": infra_info.get("Domain", ""),
+                            "IPAddress": infra_info.get("IPAddress", ""),
+                            "ServerFunction": infra_info.get("ServerFunction", ""),
+                            "OnpremSecurityZone": infra_info.get("OnpremSecurityZone", ""),
+                            "OperatingSystem": infra_info.get("OperatingSystem", ""),
+                            "vCPU": infra_info.get("vCPU", ""),
+                            "RAM": infra_info.get("RAM", ""),
+                            "DisksAndSize": infra_info.get("DisksAndSize", ""),
+                            "LunId": infra_info.get("LunId", ""),
+                            "ServerEnvironment": infra_info.get("ServerEnvironment", ""),
+                            "GeneralNotes": infra_info.get("GeneralNotes", ""),
+                            "Confidence": infra_info.get("Confidence", 0.0),
+                            "Citation": infra_info.get("Citation", "")
+                        }
+                        
+                        tc.upsert_entity(entity=entity, mode=TableUpdateMode.REPLACE)
+                        populated_count += 1
+                
+                return json.dumps({
+                    "result": "ok",
+                    "table": infra_table,
+                    "populated": populated_count,
+                    "servers_processed": len(unique_servers)
+                })
+                
+            except Exception as ex:
+                logger.exception(f"Failed to populate infrastructure table: {ex}")
+                return json.dumps({"result": "error", "message": str(ex)})
+
+        def _generate_infrastructure_query(self, server_name: str) -> str:
+            """Generate a specialized query for extracting infrastructure information for a specific server."""
+            return f"""Extract ALL infrastructure details for server '{server_name}' from the indexed documents.
+
+Find and extract the following information for '{server_name}':
+- VM Hostname (FQDN) - Server name given above or Full qualified domain name
+- Domain - Domain the server belongs to
+- IP Address - IP address(es) assigned
+- Server Function - Web, App, DB, or Others
+- On-prem Security Zone - TP/TA/TD/E1/E2/E3/Etc
+- Operating System - OS type and version
+- vCPU - Number of virtual CPUs
+- RAM - Memory in GB
+- Disks and Size - Storage configuration and sizes in GB
+- LUN ID - Storage LUN identifiers
+- Server Environment - Dev/Test/SIT/UAT/Non-Prod/Prod
+- General Notes - Any additional notes
+
+Return the results as a JSON object with exactly these fields:
+{{
+    "VMHostname": "server name given above or FQDN",
+    "Domain": "domain name",
+    "IPAddress": "IP address",
+    "ServerFunction": "Web/App/DB/Others",
+    "OnpremSecurityZone": "security zone",
+    "OperatingSystem": "OS details",
+    "vCPU": "number of vCPUs",
+    "RAM": "RAM in GB",
+    "DisksAndSize": "disk configuration",
+    "LunId": "LUN ID",
+    "ServerEnvironment": "Dev/Test/SIT/UAT/Non-Prod/Prod",
+    "GeneralNotes": "any notes",
+    "Confidence": 0.0-1.0,
+    "Citation": "source document reference"
+}}
+
+IMPORTANT:
+- Extract exact values from documents
+- If a field is not found, use empty string ""
+- Include confidence score based on data completeness
+- Return empty object {{}} if no infrastructure data found for this server"""
+
+        async def _query_infrastructure_for_server(self, query: str, server_name: str, agent_id: str) -> Dict:
+            """Query the agent for infrastructure information about a specific server."""
+            try:
+                if not agent_id:
+                    return {}
+                from azure.ai.projects.aio import AIProjectClient
+                from azure.identity.aio import DefaultAzureCredential
+                endpoint = os.environ.get("AZURE_EXISTING_AIPROJECT_ENDPOINT")
+                async with DefaultAzureCredential(exclude_shared_token_cache_credential=True) as creds:
+                    async with AIProjectClient(credential=creds, endpoint=endpoint) as ai_client:
+                        thread = await ai_client.agents.threads.create()
+                        try:
+                            ephemeral_thread_ids.add(thread.id)
+                        except Exception:
+                            pass
+                        try:
+                            await ai_client.agents.messages.create(
+                                thread_id=thread.id,
+                                role="user",
+                                content=query
+                            )
+                            run = await ai_client.agents.runs.create(
+                                thread_id=thread.id,
+                                agent_id=agent_id
+                            )
+                            import asyncio
+                            max_wait = 30
+                            wait_time = 0
+                            while run.status in ["queued", "in_progress", "requires_action"] and wait_time < max_wait:
+                                await asyncio.sleep(1)
+                                wait_time += 1
+                                run = await ai_client.agents.runs.get(
+                                    thread_id=thread.id,
+                                    run_id=run.id
+                                )
+                            if run.status == "completed":
+                                messages = ai_client.agents.messages.list(thread_id=thread.id)
+                                async for message in messages:
+                                    if message.role == "assistant":
+                                        content = message.content[0].text.value if message.content else ""
+                                        try:
+                                            import json
+                                            infra_data = json.loads(content)
+                                            if isinstance(infra_data, dict):
+                                                return infra_data
+                                        except Exception:
+                                            if "{" in content and "}" in content:
+                                                try:
+                                                    json_part = content[content.find("{"):content.rfind("}")+1]
+                                                    return json.loads(json_part)
+                                                except Exception:
+                                                    pass
+                                        return {
+                                            "VMHostname": server_name,
+                                            "Confidence": 0.3,
+                                            "Citation": "Could not parse infrastructure data"
+                                        }
+                        finally:
+                            try:
+                                await ai_client.agents.threads.delete(thread_id=thread.id)
+                            except Exception as _del_ex:
+                                logger.debug(f"Thread delete failed (infrastructure query {server_name}): {_del_ex}")
+            except Exception as ex:
+                logger.error(f"Failed to query infrastructure for {server_name}: {ex}")
+                return {}
 
     # Internal helper functions
     async def _update_indexing_status(status: str, container_created: bool = False) -> bool:
@@ -963,6 +990,540 @@ IMPORTANT:
             logger.error(f"Failed to trigger indexing: {ex}")
             return False
 
+                # Add new validation and edit functions
+    async def _present_table_results_markdown(table_name: str, entities: list) -> None:
+        """Present table results in markdown format for user validation."""
+        print(f"\n{'='*80}")
+        print(f"## Table: {table_name}")
+        print(f"{'='*80}\n")
+        
+        # Create markdown table
+        print("| # | Question | Response | Confidence |")
+        print("|---|----------|----------|------------|")
+        
+        for idx, ent in enumerate(entities, 1):
+            question = ent.get("Question", "").replace("|", "\\|")[:80]  # Truncate long questions
+            response = ent.get("Response", "").replace("|", "\\|")[:100]  # Truncate long responses
+            confidence = ent.get("Confidence", 0.0)
+            
+            # Add visual indicator for confidence level
+            if confidence >= 0.8:
+                conf_indicator = f"✓ {confidence:.2f}"
+            elif confidence >= 0.5:
+                conf_indicator = f"⚠ {confidence:.2f}"
+            else:
+                conf_indicator = f"✗ {confidence:.2f}"
+            
+            print(f"| {idx} | {question} | {response} | {conf_indicator} |")
+        
+        print(f"\n**Total Questions:** {len(entities)}")
+        low_conf_count = sum(1 for e in entities if e.get("Confidence", 1.0) < 0.5)
+        if low_conf_count > 0:
+            print(f"**Low Confidence Answers:** {low_conf_count}")
+        print()
+
+    async def _interactive_edit_responses(table_name: str, entities: list, tsc) -> tuple:
+        """Allow user to interactively edit responses after validation."""
+        tc = tsc.get_table_client(table_name=table_name)
+        edited_count = 0
+        low_conf_resolved = 0
+        
+        while True:
+            print("\n" + "="*60)
+            print("VALIDATION OPTIONS:")
+            print("="*60)
+            print("1. Approve all responses")
+            print("2. Edit specific response(s)")
+            print("3. Bulk edit low confidence responses")
+            print("4. View full details of a question")
+            print("5. Re-display table")
+            print("-"*60)
+            
+            try:
+                choice = input("Enter your choice (1-5): ").strip()
+                
+                if choice == "1":
+                    print("✓ All responses approved")
+                    break
+                    
+                elif choice == "2":
+                    # Edit specific responses
+                    edit_nums = input("Enter question numbers to edit (comma-separated, e.g., 1,3,5): ").strip()
+                    if not edit_nums:
+                        continue
+                    
+                    try:
+                        nums = [int(n.strip()) for n in edit_nums.split(",")]
+                        for num in nums:
+                            if 1 <= num <= len(entities):
+                                ent = entities[num - 1]
+                                print(f"\n--- Editing Question #{num} ---")
+                                print(f"Question: {ent.get('Question')}")
+                                print(f"Current Response: {ent.get('Response', '')}")
+                                print(f"Current Confidence: {ent.get('Confidence', 0.0):.2f}")
+                                
+                                new_response = input("\nEnter new response (or press Enter to keep current): ").strip()
+                                if new_response:
+                                    # Update in memory
+                                    ent["Response"] = new_response
+                                    ent["Confidence"] = 0.95  # High confidence for user-edited
+                                    ent["Citation"] = "User validated/edited"
+                                    
+                                    # Update in table
+                                    from azure.data.tables import UpdateMode as TableUpdateMode
+                                    tc.upsert_entity(entity=ent, mode=TableUpdateMode.MERGE)
+                                    edited_count += 1
+                                    print(f"✓ Response updated for question #{num}")
+                            else:
+                                print(f"✗ Invalid question number: {num}")
+                    except ValueError:
+                        print("✗ Invalid input. Please enter numbers only.")
+                        
+                elif choice == "3":
+                    # Bulk edit low confidence responses
+                    low_conf_entities = [(i, e) for i, e in enumerate(entities) 
+                                        if e.get("Confidence", 1.0) < 0.5 and e.get("Question")]
+                    
+                    if not low_conf_entities:
+                        print("No low confidence responses to edit.")
+                        continue
+                    
+                    print(f"\n--- Editing {len(low_conf_entities)} Low Confidence Responses ---")
+                    for idx, (orig_idx, ent) in enumerate(low_conf_entities, 1):
+                        print(f"\nLow Confidence Question {idx}/{len(low_conf_entities)} (#{orig_idx + 1}):")
+                        print(f"Q: {ent.get('Question')}")
+                        print(f"Current Answer (Confidence: {ent.get('Confidence', 0.0):.2f}): {ent.get('Response', '')}")
+                        
+                        # Check for conflicts
+                        if ent.get("ConflictDetected"):
+                            print("⚠ CONFLICT DETECTED! Multiple values found in search index:")
+                            conflicting_values = json.loads(ent.get("ConflictingValues", "[]"))
+                            for i, value in enumerate(conflicting_values, 1):
+                                print(f"  {i}. {value}")
+                        
+                        new_response = input("\nProvide better answer (or 's' to skip, 'q' to quit editing): ").strip()
+                        
+                        if new_response.lower() == 'q':
+                            break
+                        elif new_response.lower() == 's':
+                            continue
+                        elif new_response:
+                            # Update response
+                            ent["Response"] = new_response
+                            ent["Confidence"] = 0.95
+                            ent["Citation"] = "User resolved"
+                            
+                            # Clear conflict flags if they exist
+                            if "ConflictDetected" in ent:
+                                del ent["ConflictDetected"]
+                            if "ConflictingValues" in ent:
+                                del ent["ConflictingValues"]
+                            
+                            from azure.data.tables import UpdateMode as TableUpdateMode
+                            tc.upsert_entity(entity=ent, mode=TableUpdateMode.MERGE)
+                            low_conf_resolved += 1
+                            print("✓ Response updated")
+                    
+                elif choice == "4":
+                    # View full details
+                    try:
+                        num = int(input("Enter question number to view details: ").strip())
+                        if 1 <= num <= len(entities):
+                            ent = entities[num - 1]
+                            print(f"\n--- Full Details for Question #{num} ---")
+                            print(f"Question: {ent.get('Question')}")
+                            print(f"Guidance: {ent.get('Guidance', '')}")
+                            print(f"Response: {ent.get('Response', '')}")
+                            print(f"Confidence: {ent.get('Confidence', 0.0):.2f}")
+                            print(f"Citation: {ent.get('Citation', '')}")
+                            if ent.get("ConflictDetected"):
+                                print(f"Conflict Detected: Yes")
+                                print(f"Conflicting Values: {ent.get('ConflictingValues', '')}")
+                        else:
+                            print("✗ Invalid question number")
+                    except ValueError:
+                        print("✗ Please enter a valid number")
+                        
+                elif choice == "5":
+                    # Re-display table
+                    await _present_table_results_markdown(table_name, entities)
+                    
+                else:
+                    print("✗ Invalid choice. Please select 1-5.")
+                    
+            except KeyboardInterrupt:
+                print("\n\nExiting edit mode...")
+                break
+        
+        return edited_count, low_conf_resolved
+
+    async def _process_questions_with_validation(client_obj, agent_id: str, table_name: str, partition_key: str) -> dict:
+        """Process questions and allow user validation/editing before finalizing."""
+        # First, process all questions (existing logic)
+        result = await _process_questions_for_table(client_obj, agent_id, table_name, partition_key)
+        
+        if result.get("result") != "ok":
+            return result
+        
+        # Now present results for validation
+        try:
+            from azure.data.tables import TableServiceClient
+            from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
+            
+            conn_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+            if conn_str:
+                tsc = TableServiceClient.from_connection_string(conn_str)
+            else:
+                tables_url = os.getenv("AZURE_TABLES_ACCOUNT_URL")
+                if not tables_url:
+                    return result
+                cred = SyncDefaultAzureCredential(exclude_shared_token_cache_credential=True)
+                tsc = TableServiceClient(endpoint=tables_url, credential=cred)
+            
+            tc = tsc.get_table_client(table_name=table_name)
+            
+            # Get all entities to present
+            escaped_pk = str(partition_key).replace("'", "''")
+            server_filter = f"PartitionKey eq '{escaped_pk}'"
+            entities = list(tc.query_entities(query_filter=server_filter))
+            
+            # Filter to show only entities with questions
+            qa_entities = [e for e in entities if e.get("Question")]
+            
+            if qa_entities:
+                # Present in markdown format
+                await _present_table_results_markdown(table_name, qa_entities)
+                
+                # Ask user if they want to validate/edit
+                validate_choice = input("Would you like to validate/edit these responses? (yes/no): ").strip().lower()
+                
+                if validate_choice in ["yes", "y"]:
+                    edited_count, low_conf_resolved = await _interactive_edit_responses(table_name, qa_entities, tsc)
+                    
+                    # Update result with edit statistics
+                    result["edited"] = edited_count
+                    result["lowConfidenceResolved"] = low_conf_resolved
+                    
+                    # Recalculate low confidence count after edits
+                    new_low_conf = sum(1 for e in qa_entities if e.get("Confidence", 1.0) < 0.5)
+                    result["lowConfidence"] = new_low_conf
+                    result["lowConfidenceQuestions"] = [
+                        {
+                            "Table": table_name,
+                            "RowKey": e.get("RowKey"),
+                            "Question": e.get("Question"),
+                            "Response": e.get("Response", ""),
+                            "Confidence": e.get("Confidence", 0.0)
+                        }
+                        for e in qa_entities if e.get("Confidence", 1.0) < 0.5
+                    ]
+                    
+                    print(f"\n✓ Validation complete for {table_name}")
+                    if edited_count > 0:
+                        print(f"  - Edited: {edited_count} responses")
+                    if low_conf_resolved > 0:
+                        print(f"  - Resolved: {low_conf_resolved} low confidence responses")
+                else:
+                    print(f"✓ Proceeding without validation for {table_name}")
+            
+        except Exception as ex:
+            logger.warning(f"Validation/edit phase failed for {table_name}: {ex}")
+            # Continue with original result if validation fails
+        
+        return result
+
+    async def _present_dependency_results_markdown(table_name: str, entities: list) -> None:
+        """Present dependency table results in markdown format."""
+        print(f"\n{'='*80}")
+        print(f"## Table: {table_name} (Integration Dependencies)")
+        print(f"{'='*80}\n")
+        
+        print("| # | Source | Source IP | Destination | Dest IP | Protocol | Port | Description |")
+        print("|---|--------|-----------|-------------|---------|----------|------|-------------|")
+        
+        for idx, ent in enumerate(entities, 1):
+            src_host = (ent.get("SourceHostname", "")[:20] or "-").replace("|", "\\|")
+            src_ip = (ent.get("SourceIPAddress", "") or "-").replace("|", "\\|")
+            dst_host = (ent.get("DestinationHostname", "")[:20] or "-").replace("|", "\\|")
+            dst_ip = (ent.get("DestinationIPAddress", "") or "-").replace("|", "\\|")
+            protocol = (ent.get("InboundOrOutboundProtocol", "") or "-").replace("|", "\\|")
+            port = (ent.get("InboundOrOutboundPortNumber", "") or "-").replace("|", "\\|")
+            desc = (ent.get("Description", "")[:30] or "-").replace("|", "\\|")
+            
+            print(f"| {idx} | {src_host} | {src_ip} | {dst_host} | {dst_ip} | {protocol} | {port} | {desc} |")
+        
+        print(f"\n**Total Dependencies:** {len(entities)}")
+
+    async def _interactive_edit_dependencies(table_name: str, entities: list, tsc) -> int:
+        """Allow user to edit dependency entries."""
+        tc = tsc.get_table_client(table_name=table_name)
+        edited_count = 0
+        
+        while True:
+            print("\n" + "="*60)
+            print("DEPENDENCY VALIDATION OPTIONS:")
+            print("="*60)
+            print("1. Approve all entries")
+            print("2. Edit specific entry")
+            print("3. Add new dependency")
+            print("4. Delete entry")
+            print("5. Re-display table")
+            print("-"*60)
+            
+            choice = input("Enter your choice (1-5): ").strip()
+            
+            if choice == "1":
+                print("✓ All dependencies approved")
+                break
+                
+            elif choice == "2":
+                try:
+                    num = int(input("Enter entry number to edit: ").strip())
+                    if 1 <= num <= len(entities):
+                        ent = entities[num - 1]
+                        print(f"\n--- Editing Entry #{num} ---")
+                        print("Leave blank to keep current value")
+                        
+                        fields = [
+                            ("SourceHostname", "Source Hostname"),
+                            ("SourceIPAddress", "Source IP"),
+                            ("DestinationHostname", "Destination Hostname"),
+                            ("DestinationIPAddress", "Destination IP"),
+                            ("InboundOrOutboundProtocol", "Protocol"),
+                            ("InboundOrOutboundPortNumber", "Port"),
+                            ("Description", "Description")
+                        ]
+                        
+                        updated = False
+                        for field, label in fields:
+                            current = ent.get(field, "")
+                            new_val = input(f"{label} [{current}]: ").strip()
+                            if new_val:
+                                ent[field] = new_val
+                                updated = True
+                        
+                        if updated:
+                            from azure.data.tables import UpdateMode as TableUpdateMode
+                            tc.upsert_entity(entity=ent, mode=TableUpdateMode.MERGE)
+                            edited_count += 1
+                            print(f"✓ Entry #{num} updated")
+                except ValueError:
+                    print("✗ Invalid input")
+                    
+            elif choice == "3":
+                # Add new dependency
+                print("\n--- Adding New Dependency ---")
+                new_ent = {
+                    "PartitionKey": application_id,
+                    "RowKey": f"UserAdded_{len(entities)+1}_{edited_count}",
+                    "SourceHostname": input("Source Hostname: ").strip(),
+                    "SourceIPAddress": input("Source IP: ").strip(),
+                    "DestinationHostname": input("Destination Hostname: ").strip(),
+                    "DestinationIPAddress": input("Destination IP: ").strip(),
+                    "InboundOrOutboundProtocol": input("Protocol (TCP/UDP/HTTP/HTTPS): ").strip(),
+                    "InboundOrOutboundPortNumber": input("Port: ").strip(),
+                    "Description": input("Description: ").strip(),
+                    "Confidence": 1.0,
+                    "Citation": "User added"
+                }
+                tc.upsert_entity(entity=new_ent)
+                entities.append(new_ent)
+                edited_count += 1
+                print("✓ New dependency added")
+                
+            elif choice == "4":
+                try:
+                    num = int(input("Enter entry number to delete: ").strip())
+                    if 1 <= num <= len(entities):
+                        ent = entities[num - 1]
+                        confirm = input(f"Delete entry #{num}? (yes/no): ").strip().lower()
+                        if confirm in ["yes", "y"]:
+                            tc.delete_entity(partition_key=ent["PartitionKey"], row_key=ent["RowKey"])
+                            entities.pop(num - 1)
+                            edited_count += 1
+                            print(f"✓ Entry #{num} deleted")
+                except ValueError:
+                    print("✗ Invalid input")
+                    
+            elif choice == "5":
+                await _present_dependency_results_markdown(table_name, entities)
+                
+            else:
+                print("✗ Invalid choice")
+        
+        return edited_count
+
+    async def _present_infrastructure_results_markdown(table_name: str, entities: list) -> None:
+        """Present infrastructure table results in markdown format."""
+        print(f"\n{'='*80}")
+        print(f"## Table: {table_name} (Infrastructure Details)")
+        print(f"{'='*80}\n")
+        
+        print("| # | VM Hostname | IP Address | OS | vCPU | RAM | Environment | Function |")
+        print("|---|-------------|------------|-----|------|-----|-------------|----------|")
+        
+        for idx, ent in enumerate(entities, 1):
+            vm = (ent.get("VMHostname", "")[:25] or "-").replace("|", "\\|")
+            ip = (ent.get("IPAddress", "") or "-").replace("|", "\\|")
+            os = (ent.get("OperatingSystem", "")[:20] or "-").replace("|", "\\|")
+            vcpu = (ent.get("vCPU", "") or "-").replace("|", "\\|")
+            ram = (ent.get("RAM", "") or "-").replace("|", "\\|")
+            env = (ent.get("ServerEnvironment", "") or "-").replace("|", "\\|")
+            func = (ent.get("ServerFunction", "") or "-").replace("|", "\\|")
+            
+            print(f"| {idx} | {vm} | {ip} | {os} | {vcpu} | {ram} | {env} | {func} |")
+        
+        print(f"\n**Total Servers:** {len(entities)}")
+
+    async def _interactive_edit_infrastructure(table_name: str, entities: list, tsc) -> int:
+        """Allow user to edit infrastructure entries."""
+        tc = tsc.get_table_client(table_name=table_name)
+        edited_count = 0
+        
+        while True:
+            print("\n" + "="*60)
+            print("INFRASTRUCTURE VALIDATION OPTIONS:")
+            print("="*60)
+            print("1. Approve all entries")
+            print("2. Edit specific server")
+            print("3. View full server details")
+            print("4. Re-display table")
+            print("-"*60)
+            
+            choice = input("Enter your choice (1-4): ").strip()
+            
+            if choice == "1":
+                print("✓ All infrastructure entries approved")
+                break
+                
+            elif choice == "2":
+                try:
+                    num = int(input("Enter server number to edit: ").strip())
+                    if 1 <= num <= len(entities):
+                        ent = entities[num - 1]
+                        print(f"\n--- Editing Server #{num} ---")
+                        print("Leave blank to keep current value")
+                        
+                        fields = [
+                            ("VMHostname", "VM Hostname"),
+                            ("Domain", "Domain"),
+                            ("IPAddress", "IP Address"),
+                            ("ServerFunction", "Server Function (Web/App/DB/Others)"),
+                            ("OnpremSecurityZone", "Security Zone"),
+                            ("OperatingSystem", "Operating System"),
+                            ("vCPU", "vCPU"),
+                            ("RAM", "RAM (GB)"),
+                            ("DisksAndSize", "Disks and Size"),
+                            ("ServerEnvironment", "Environment (Dev/Test/UAT/Prod)"),
+                            ("GeneralNotes", "Notes")
+                        ]
+                        
+                        updated = False
+                        for field, label in fields:
+                            current = ent.get(field, "")
+                            new_val = input(f"{label} [{current}]: ").strip()
+                            if new_val:
+                                ent[field] = new_val
+                                updated = True
+                        
+                        if updated:
+                            ent["Confidence"] = 0.95
+                            ent["Citation"] = "User validated/edited"
+                            from azure.data.tables import UpdateMode as TableUpdateMode
+                            tc.upsert_entity(entity=ent, mode=TableUpdateMode.MERGE)
+                            edited_count += 1
+                            print(f"✓ Server #{num} updated")
+                except ValueError:
+                    print("✗ Invalid input")
+                    
+            elif choice == "3":
+                try:
+                    num = int(input("Enter server number to view details: ").strip())
+                    if 1 <= num <= len(entities):
+                        ent = entities[num - 1]
+                        print(f"\n--- Full Details for Server #{num} ---")
+                        for key, value in ent.items():
+                            if key not in ["PartitionKey", "RowKey", "etag", "Timestamp"]:
+                                print(f"{key}: {value}")
+                except ValueError:
+                    print("✗ Invalid input")
+                    
+            elif choice == "4":
+                await _present_infrastructure_results_markdown(table_name, entities)
+                
+            else:
+                print("✗ Invalid choice")
+        
+        return edited_count
+
+    # Modify the main workflow to use validation functions
+    async def _process_all_qa_tables_with_validation(client_obj, agent_id: str) -> dict:
+        """Process questions in all QA tables with validation after each table."""
+        tables_to_process = [
+            f"AppDetails{application_id}",
+            f"PrivacyAndSecurity{application_id}",
+            f"MSSQLDB{application_id}",
+            f"OracleDB{application_id}"
+        ]
+        
+        all_results = {}
+        all_low_confidence = []
+        
+        for table_name in tables_to_process:
+            # Check if table exists before processing
+            try:
+                conn_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+                if conn_str:
+                    from azure.data.tables import TableServiceClient
+                    tsc = TableServiceClient.from_connection_string(conn_str)
+                else:
+                    from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
+                    from azure.data.tables import TableServiceClient
+                    tables_url = os.getenv("AZURE_TABLES_ACCOUNT_URL")
+                    if not tables_url:
+                        continue
+                    cred = SyncDefaultAzureCredential(exclude_shared_token_cache_credential=True)
+                    tsc = TableServiceClient(endpoint=tables_url, credential=cred)
+                
+                # Try to get table client to verify it exists
+                tc = tsc.get_table_client(table_name=table_name)
+                # Do a quick query to verify table exists
+                try:
+                    next(tc.query_entities(max_page_size=1), None)
+                except Exception as e:
+                    if "TableNotFound" in str(e) or "ResourceNotFound" in str(e):
+                        logger.debug(f"Table {table_name} not found, skipping")
+                        continue
+                
+                print(f"\n  Processing table: {table_name}...")
+                # Use the new validation-enabled function
+                result = await _process_questions_with_validation(client_obj, agent_id, table_name, application_id)
+                all_results[table_name] = result
+                
+                if result.get("result") == "ok":
+                    print(f"    ✓ Processed {result.get('answered')} questions")
+                    if result.get('edited', 0) > 0:
+                        print(f"    ✓ Edited {result.get('edited')} responses")
+                    if result.get('lowConfidenceResolved', 0) > 0:
+                        print(f"    ✓ Resolved {result.get('lowConfidenceResolved')} low confidence responses")
+                    if result.get('lowConfidence', 0) > 0:
+                        print(f"    ⚠ Remaining low confidence: {result.get('lowConfidence', 0)}")
+                    
+                    # Collect remaining low confidence questions
+                    all_low_confidence.extend(result.get("lowConfidenceQuestions", []))
+                    
+            except Exception as ex:
+                logger.warning(f"Failed to process table {table_name}: {ex}")
+                continue
+        
+        return {
+            "result": "ok",
+            "tables_processed": len(all_results),
+            "results": all_results,
+            "total_low_confidence": len(all_low_confidence),
+            "all_low_confidence_questions": all_low_confidence
+        }
+
     async def _process_questions_for_table(client_obj, agent_id: str, table_name: str, partition_key: str) -> dict:
         """Process all questions for a specific table and calculate confidence scores."""
         try:
@@ -1008,6 +1569,14 @@ IMPORTANT:
             try:
                 # Get response from agent
                 resp = await answer_agent.get_response(messages=q, thread=None)
+                # Track and schedule deletion of any underlying thread if available
+                try:
+                    resp_thread = getattr(resp, 'thread', None)
+                    resp_thread_id = getattr(resp_thread, 'id', None)
+                    if resp_thread_id:
+                        ephemeral_thread_ids.add(resp_thread_id)
+                except Exception:
+                    pass
                 text = str(resp).strip()
                 logger.debug(f"Agent response for '{q[:50]}...': in table {table_name}: {text[:200]}")
                 
@@ -1117,27 +1686,58 @@ IMPORTANT:
         }
 
     async def _process_all_qa_tables(client_obj, agent_id: str) -> dict:
-        """Process questions in all QA tables (AppDetails and PrivacyAndSecurity)."""
+        """Process questions in all QA tables."""
         tables_to_process = [
             f"AppDetails{application_id}",
-            f"PrivacyAndSecurity{application_id}"
+            f"PrivacyAndSecurity{application_id}",
+            f"MSSQLDB{application_id}",       # Add new Q&A table
+            f"OracleDB{application_id}"        # Add new Q&A table
         ]
         
         all_results = {}
         all_low_confidence = []
         
         for table_name in tables_to_process:
-            print(f"  Processing table: {table_name}...")
-            result = await _process_questions_for_table(client_obj, agent_id, table_name, application_id)
-            all_results[table_name] = result
-            
-            if result.get("result") == "ok":
-                print(f"    ✓ Processed {result.get('answered')} questions")
-                if result.get('lowConfidence', 0) > 0:
-                    print(f"    ⚠ Low confidence: {result.get('lowConfidence', 0)}")
+            # Check if table exists before processing
+            try:
+                conn_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+                if conn_str:
+                    from azure.data.tables import TableServiceClient
+                    tsc = TableServiceClient.from_connection_string(conn_str)
+                else:
+                    from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
+                    from azure.data.tables import TableServiceClient
+                    tables_url = os.getenv("AZURE_TABLES_ACCOUNT_URL")
+                    if not tables_url:
+                        continue
+                    cred = SyncDefaultAzureCredential(exclude_shared_token_cache_credential=True)
+                    tsc = TableServiceClient(endpoint=tables_url, credential=cred)
                 
-                # Collect all low confidence questions
-                all_low_confidence.extend(result.get("lowConfidenceQuestions", []))
+                # Try to get table client to verify it exists
+                tc = tsc.get_table_client(table_name=table_name)
+                # Do a quick query to verify table exists
+                try:
+                    next(tc.query_entities(max_page_size=1), None)
+                except Exception as e:
+                    if "TableNotFound" in str(e) or "ResourceNotFound" in str(e):
+                        logger.debug(f"Table {table_name} not found, skipping")
+                        continue
+                
+                print(f"  Processing table: {table_name}...")
+                result = await _process_questions_for_table(client_obj, agent_id, table_name, application_id)
+                all_results[table_name] = result
+                
+                if result.get("result") == "ok":
+                    print(f"    ✓ Processed {result.get('answered')} questions")
+                    if result.get('lowConfidence', 0) > 0:
+                        print(f"    ⚠ Low confidence: {result.get('lowConfidence', 0)}")
+                    
+                    # Collect all low confidence questions
+                    all_low_confidence.extend(result.get("lowConfidenceQuestions", []))
+                    
+            except Exception as ex:
+                logger.warning(f"Failed to process table {table_name}: {ex}")
+                continue
         
         return {
             "result": "ok",
@@ -1332,37 +1932,120 @@ IMPORTANT:
                     # Step 5: Create agent and process questions
                     print("\nStep 5: Creating answer agent and processing questions...")
                     agent_id = await ensure_agent(application_id)
+                    answer_agent_ids.add(agent_id)
                     if agent_id:
                         print(f"✓ Answer agent created: {agent_id}")
                         
                         print("\nProcessing questions from all QA tables...")
-                        qa_result = await _process_all_qa_tables(client, agent_id)
+                        # Use the new validation-enabled function
+                        qa_result = await _process_all_qa_tables_with_validation(client, agent_id)
                         
                         if qa_result.get("result") == "ok":
-                            for table_name, table_result in qa_result.get("results", {}).items():
-                                print(f"  {table_name}:")
-                                print(f"    - Processed: {table_result.get('answered')} questions")
-                                print(f"    - Low confidence: {table_result.get('lowConfidence', 0)}")
+                            # Results already printed by the function
                             
-                            # Collect all low confidence questions
+                            # Collect all remaining low confidence questions
                             all_low_conf = qa_result.get("all_low_confidence_questions", [])
                             
-                            # Step 6: Process dependency information
+                            # Step 6: Process dependency information with validation
                             print("\nStep 6: Extracting and populating dependency information...")
                             dep_result = await plugin.populate_dependency_table()
                             dep_data = json.loads(dep_result)
                             if dep_data.get("result") == "ok":
                                 print(f"✓ Populated {dep_data.get('populated')} dependency records")
                                 print(f"  Processed {dep_data.get('servers_processed')} unique servers")
+                                # Ensure TableServiceClient initialized for validation steps
+                                if 'tsc' not in locals() or tsc is None:
+                                    try:
+                                        from azure.data.tables import TableServiceClient
+                                        from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
+                                        conn_str_val = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+                                        if conn_str_val:
+                                            tsc = TableServiceClient.from_connection_string(conn_str_val)
+                                        else:
+                                            tables_url_val = os.getenv("AZURE_TABLES_ACCOUNT_URL")
+                                            if tables_url_val:
+                                                cred_val = SyncDefaultAzureCredential(exclude_shared_token_cache_credential=True)
+                                                tsc = TableServiceClient(endpoint=tables_url_val, credential=cred_val)
+                                            else:
+                                                tsc = None
+                                    except Exception as _init_ex:
+                                        logger.warning(f"Unable to initialize TableServiceClient for dependency validation: {_init_ex}")
+                                        tsc = None
+
+                                # Validate dependency entries
+                                dep_table = f"IntegrationDependency{application_id}"
+                                try:
+                                    if tsc:
+                                        tc = tsc.get_table_client(table_name=dep_table)
+                                        dep_entities = list(tc.query_entities(query_filter=f"PartitionKey eq '{application_id}'"))
+                                        if dep_entities:
+                                            await _present_dependency_results_markdown(dep_table, dep_entities)
+                                            validate_choice = input("Would you like to validate/edit these dependencies? (yes/no): ").strip().lower()
+                                            if validate_choice in ["yes", "y"]:
+                                                edited = await _interactive_edit_dependencies(dep_table, dep_entities, tsc)
+                                                if edited > 0:
+                                                    print(f"✓ Updated {edited} dependency entries")
+                                    else:
+                                        logger.warning("Skipping dependency validation: TableServiceClient unavailable")
+                                except Exception as ex:
+                                    logger.warning(f"Dependency validation failed: {ex}")
                             else:
                                 print(f"⚠ Dependency extraction: {dep_data.get('message')}")
+                            
+                            # Step 7: Process infrastructure information with validation
+                            print("\nStep 7: Extracting and populating infrastructure details...")
+                            infra_result = await plugin.populate_infrastructure_table()
+                            infra_data = json.loads(infra_result)
+                            if infra_data.get("result") == "ok":
+                                print(f"✓ Populated {infra_data.get('populated')} infrastructure records")
+                                print(f"  Processed {infra_data.get('servers_processed')} servers")
+                                # Ensure TableServiceClient initialized for infrastructure validation
+                                if 'tsc' not in locals() or tsc is None:
+                                    try:
+                                        from azure.data.tables import TableServiceClient
+                                        from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
+                                        conn_str_val = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+                                        if conn_str_val:
+                                            tsc = TableServiceClient.from_connection_string(conn_str_val)
+                                        else:
+                                            tables_url_val = os.getenv("AZURE_TABLES_ACCOUNT_URL")
+                                            if tables_url_val:
+                                                cred_val = SyncDefaultAzureCredential(exclude_shared_token_cache_credential=True)
+                                                tsc = TableServiceClient(endpoint=tables_url_val, credential=cred_val)
+                                            else:
+                                                tsc = None
+                                    except Exception as _init_ex:
+                                        logger.warning(f"Unable to initialize TableServiceClient for infrastructure validation: {_init_ex}")
+                                        tsc = None
+
+                                # Validate infrastructure entries
+                                infra_table = f"InfrastructureDetails{application_id}"
+                                try:
+                                    if tsc:
+                                        tc = tsc.get_table_client(table_name=infra_table)
+                                        infra_entities = list(tc.query_entities(query_filter=f"PartitionKey eq '{application_id}'"))
+                                        if infra_entities:
+                                            await _present_infrastructure_results_markdown(infra_table, infra_entities)
+                                            validate_choice = input("Would you like to validate/edit these infrastructure details? (yes/no): ").strip().lower()
+                                            if validate_choice in ["yes", "y"]:
+                                                edited = await _interactive_edit_infrastructure(infra_table, infra_entities, tsc)
+                                                if edited > 0:
+                                                    print(f"✓ Updated {edited} infrastructure entries")
+                                    else:
+                                        logger.warning("Skipping infrastructure validation: TableServiceClient unavailable")
+                                except Exception as ex:
+                                    logger.warning(f"Infrastructure validation failed: {ex}")
+                            else:
+                                print(f"⚠ Infrastructure extraction: {infra_data.get('message')}")
                         
-                        # Step 7: Resolve low confidence questions if any exist
+                        # Step 8: Final check for any remaining low confidence questions
                         if len(all_low_conf) > 0:
-                            print(f"\n✓ Total low confidence questions across all tables: {len(all_low_conf)}")
-                            resolve = input("\nWould you like to resolve low confidence questions now? (yes/no): ").strip().lower()
+                            print(f"\n⚠ {len(all_low_conf)} low confidence questions remain after validation")
+                            resolve = input("Would you like to resolve remaining low confidence questions? (yes/no): ").strip().lower()
                             if resolve in ["yes", "y"]:
                                 await _interactive_low_confidence_resolution(all_low_conf)
+                        else:
+                            print("\n✓ All questions have been processed with acceptable confidence levels")
             
             print(f"\n=== Setup Complete ===")
             print(f"Orchestrator ready. Type 'help' for available commands or 'exit' to quit.\n")
@@ -1384,6 +2067,7 @@ IMPORTANT:
                         print("\nAvailable commands:")
                         print("  /reindex - Retry indexing after uploading files")
                         print("  /processqa - Process all questions again")
+                        print("  /processinfra - Process infrastructure details")
                         print("  /resolvelow - Resolve low confidence questions")
                         print("  /status - Show current status")
                         print("  /qasummary - Show Q&A summary")
@@ -1404,6 +2088,7 @@ IMPORTANT:
                     # Process QA command
                     if user_input.startswith("/processqa"):
                         agent_id = await ensure_agent(application_id)
+                        answer_agent_ids.add(agent_id)
                         if agent_id:
                             result = await _process_all_qa_tables(client, agent_id)
                             if result.get("result") == "ok":
@@ -1425,9 +2110,27 @@ IMPORTANT:
                         # Get current low confidence questions from all tables
                         tables = [f"AppDetails{application_id}", f"PrivacyAndSecurity{application_id}"]
                         current_low_conf = []
+                        # Establish table client
+                        try:
+                            from azure.data.tables import TableServiceClient
+                            from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
+                            conn_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+                            if conn_str:
+                                tsc = TableServiceClient.from_connection_string(conn_str)
+                            else:
+                                tables_url = os.getenv("AZURE_TABLES_ACCOUNT_URL")
+                                if tables_url:
+                                    cred = SyncDefaultAzureCredential(exclude_shared_token_cache_credential=True)
+                                    tsc = TableServiceClient(endpoint=tables_url, credential=cred)
+                                else:
+                                    tsc = None
+                        except Exception:
+                            tsc = None
                         
                         for table_name in tables:
                             try:
+                                if not tsc:
+                                    continue
                                 tc = tsc.get_table_client(table_name=table_name)
                                 entities = list(tc.query_entities(query_filter=f"PartitionKey eq '{application_id}'"))
                                 for ent in entities:
@@ -1469,10 +2172,52 @@ IMPORTANT:
                         print(f"Assistant error: {ex}")
                         
             finally:
-                try:
-                    await thread.delete() if thread else None
-                except Exception:
-                    pass
+                # Cleanup resources (threads + agents) if enabled
+                if cleanup and os.getenv("APP_CLEANUP_ON_EXIT", "true").lower() in {"1", "true", "yes", "on"}:
+                    print("\nInitiating cleanup of threads and agents ...")
+                    # Delete chat loop thread (Semantic Kernel thread wrapper)
+                    try:
+                        if thread and getattr(thread, "id", None):
+                            await client.agents.threads.delete(thread_id=thread.id)
+                            print(f"  ✓ Deleted main interaction thread: {thread.id}")
+                    except Exception as ex:
+                        print(f"  ⚠ Could not delete main thread: {ex}")
+
+                    # Delete ephemeral threads created during dependency / infrastructure extraction
+                    deleted_threads = 0
+                    for t_id in list(ephemeral_thread_ids):
+                        try:
+                            await client.agents.threads.delete(thread_id=t_id)
+                            deleted_threads += 1
+                        except Exception:
+                            pass
+                    if deleted_threads:
+                        print(f"  ✓ Deleted {deleted_threads} ephemeral threads")
+
+                    # Delete answer agents (intake agents) gathered during session
+                    deleted_agents = 0
+                    for a_id in list(answer_agent_ids):
+                        try:
+                            await client.agents.delete_agent(agent_id=a_id)
+                            deleted_agents += 1
+                            print(f"  ✓ Deleted answer agent: {a_id}")
+                        except Exception as ex:
+                            print(f"  ⚠ Could not delete answer agent {a_id}: {ex}")
+
+                    # Delete orchestrator agent last
+                    try:
+                        if agent_definition and getattr(agent_definition, "id", None):
+                            await client.agents.delete_agent(agent_id=agent_definition.id)
+                            print(f"  ✓ Deleted orchestrator agent: {agent_definition.id}")
+                    except Exception as ex:
+                        print(f"  ⚠ Could not delete orchestrator agent: {ex}")
+
+                    print("Cleanup complete.\n")
+                else:
+                    try:
+                        await thread.delete() if thread else None
+                    except Exception:
+                        pass
 
 
 def main() -> None:
@@ -1486,10 +2231,16 @@ def main() -> None:
         "--application-id",
         help="Application ID to use",
     )
+    parser.add_argument(
+        "--no-cleanup",
+        action="store_true",
+        help="Disable automatic deletion of agents and threads on exit"
+    )
     args = parser.parse_args()
     
     import asyncio as _asyncio
-    _asyncio.run(chat_loop(args.orchestrator_name, args.application_id))
+    cleanup_enabled = not args.no_cleanup
+    _asyncio.run(chat_loop(args.orchestrator_name, args.application_id, cleanup=cleanup_enabled))
 
 
 if __name__ == "__main__":
