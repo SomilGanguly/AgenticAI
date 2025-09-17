@@ -1,120 +1,195 @@
 {
   "title": "Application Summary Report (ASR) Template",
-  "sections_array": [
-    {
-      "id": "Application Overview",
-      "prompt": "Provide a structured summary of the application lifecycle and environment classification for Customer Rewards portal. Include the following details for each environment (Dev, SIT, Test, PAT, Pre-Prod, Production):\n\nBusiness Criticality\nService Category\nInformation Classification\n\nAlso include the overall application-level classification. Format the output as a table with columns for:\n\nEnvironment\nBusiness Criticality\nService Category\nInformation Classification",
-      "table_name": "AppDetails"
-    },
-    {
-        "id": "Key Business Drivers",
-        "prompt": "List and describe the key business drivers for [Application Name]. Include at least three drivers, explaining their importance to the business and how they impact the application's development and maintenance.",
-        "table_name": "AppDetails"
-    },
-    {
-        "id": "Key Contacts",
-        "prompt": "Provide a structured list of key contacts supporting the migration of [Application Name] to Azure. For each contact, include: Full Name, Email Address, Title or Role. Format the output as a table with columns: Full Name, Email, Title.",
-        "table_name": "AppDetails"
-    },
-    {
-        "id": "Migration Strategy"
-    },
-    {
-        "id": "Migration Pattern and Complexity",
-        "prompt": "Provide a detailed migration strategy for the [Application Name] being moved to Azure. Include: Service Name, Application Name, Environment (e.g., Dev, Pre-Prod, Production), Migration Pattern like Rehost or Redeploy or Replatform for each tier (Application, Database, Presentation, Middleware etc.), Complexity Level. Format the output as a table with the following columns: Service Name, App Name, Environment, Migration Pattern, Complexity.",
-        "decision_considerations": {
-            "parameters": [
-                {
-                "name": "Approach",
-                "Rehost": "Low-touch: Tool-based migration by servers or subnet, AVS migrations using VMware HCX",
-                "Replatform": "Medium-touch: Tool-based migration by application",
-                "Redeploy": "High-touch: Deployment of new servers by application"
-                },
-                {
-                "name": "Effort",
-                "Rehost": "Simple: Light assessment and planning; minimal application owner involvement",
-                "Replatform": "Medium: Standard assessment and planning; moderate application owner involvement",
-                "Redeploy": "Complex: Deep assessment and planning; significant application owner involvement"
-                },
-                {
-                "name": "Planning",
-                "Rehost": "Tool-based go/no-go decision",
-                "Replatform": "Guided by an Application Migration Plan",
-                "Redeploy": "Guided by both an Application Migration Plan and an Application Deployment Plan"
-                },
-                {
-                "name": "Outcomes",
-                "Rehost": "As-is migration of servers to Azure IaaS or AVS",
-                "Replatform": "As-is migration of application to Azure IaaS or AVS; OS upgrade available via automation (Complex Application Migration only)",
-                "Redeploy": "Optimization includes Infrastructure-as-Code, new OS version, and upgraded application components; targeting Azure IaaS, AVS, or PaaS"
-                },
-                {
-                "name": "Databases",
-                "Rehost": "Databases, if any, migrated as part of server migration",
-                "Replatform": "Simple/Medium complexity databases migrated to Azure IaaS, AVS, or PaaS",
-                "Redeploy": "Simple/Medium complexity databases migrated to Azure IaaS, AVS, or PaaS"
-                },
-                {
-                "name": "Migration Velocity",
-                "Rehost": "Fast: Accelerates migration to Azure IaaS or AVS with little application owner involvement",
-                "Replatform": "Medium: Migration velocity dependent upon customer resource availability for UAT",
-                "Redeploy": "Varies: Migration velocity dependent upon customer resource availability for planning/UAT and number of scale components"
-                },
-                {
-                "name": "Scale/High-Availability",
-                "Rehost": "Direct server migration",
-                "Replatform": "Direct server migration",
-                "Redeploy": "Ability to deploy new scaling/HA solution including VM Scale Sets, Availability Zones, etc."
-                },
-                {
-                "name": "UAT/Cutover",
-                "Rehost": "Simple: Limited to OS health; combined UAT and cutover",
-                "Replatform": "Medium: Combined UAT and cutover; test failover possible for limited pre-cutover testing",
-                "Redeploy": "Complex: Full UAT possible prior to cutover event"
-                },
-                {
-                "name": "Target Workloads",
-                "Rehost": "Best suited to non-production and less critical workloads",
-                "Replatform": "Best suited to production and important workloads where cutover and UAT can be performed together",
-                "Redeploy": "Best suited to production and business critical workloads where complex UAT must be performed in advance of cutover"
-                },
-                {
-                "name": "Out of Scope",
-                "Rehost": "Container to Container Migrations, Highly Complex Applications (e.g., BizTalk, SAP, Teradata, Oracle EBS), Unix systems requiring rewrite, Mainframe OS, Citrix Systems",
-                "Replatform": "Same as Rehost",
-                "Redeploy": "Same as Rehost"
-                }
-            ]
-        }
-    },
-    {
-        "id": "Indicative Azure Cost",
-        "prompt": "For each environment provide the Azure cost in a tabular format with the following columns Environment, Cost. The data has to be fetched from Azure Migrate Assessment Report document in the Azure AI search."
-    },
-    {
-        "id": "Security Considerations",
-        "prompt": "Identify and describe the key security considerations for [Application Name] in the context of its migration to Azure. Include aspects such as data protection, access controls, and compliance requirements."
-    },
-    {
-        "id": "Resiliency Configurations",
-        "prompt": "Outline the resiliency configurations that should be implemented for [Application Name] in Azure. Include details on high availability, disaster recovery, and backup strategies."
-    },
-    {
-        "id": "Network Access Requirements",
-        "prompt": ""
-    },
-    {
-        "id": "Identity providers",
-        "prompt": ""
-    },
-    {
-        "id": "Observability",
-        "prompt": ""
-    },
-    {
-        "id": "Application Network Flow",
-        "prompt": ""
-    }
-  ]
+    "sections_array": [
+            {
+              "knowledge": [],
+              "id": "1. Application Overview",
+              "prompt": "Provide a structured summary of the application lifecycle and environment classification for Customer Rewards portal. Include the following details for each environment (Dev, SIT, Test, PAT, Pre-Prod, Production):\n\nBusiness Criticality\nService Category\nInformation Classification\n\nAlso include the overall application-level classification. Format the output as a table with columns for:\n\nEnvironment\nBusiness Criticality\nService Category\nInformation Classification",
+              "table_name": "AppDetails"
+            },
+            {
+              "knowledge": [],
+              "id": "1.1 Key Business Drivers",
+              "prompt": "List and describe the key business drivers for [Application Name]. Include at least three drivers, explaining their importance to the business and how they impact the application's development and maintenance.",
+              "table_name": "AppDetails"
+            },
+            {
+              "knowledge": [],
+              "id": "1.2 Key Contacts",
+              "prompt": "Provide a structured list of key contacts supporting the migration of [Application Name] to Azure. For each contact, include: Full Name, Email Address, Title or Role. Format the output as a table with columns: Full Name, Email, Title.",
+              "table_name": "AppDetails"
+            },
+            {
+              "table_name": "",
+              "knowledge": [],
+              "id": "1.3 Migration Strategy"
+            },
+            {
+              "table_name": "",
+              "id": "1.3.1 Migration Pattern and Complexity",
+              "prompt": "Provide a detailed migration strategy for the [Application Name] being moved to Azure. Include: Service Name, Application Name, Environment (e.g., Dev, Pre-Prod, Production), Migration Pattern like Rehost or Redeploy or Replatform for each tier (Application, Database, Presentation, Middleware etc.), Complexity Level. Format the output as a table with the following columns: Service Name, App Name, Environment, Migration Pattern, Complexity. Use the provided os_migration_matrix field to select the correct migration type and target OS version for each server.",
+              "knowledge": [
+                {"os_family": "Linux", "os": "RHEL", "source_vmware": ["9.x", "8.x"], "target_azure": ["9.x", "8.x"], "migration_type": "Re-Host"},
+                {"os_family": "Linux", "os": "RHEL", "source_vmware": ["6.x", "7.x"], "target_azure": ["8.x"], "migration_type": "Clean Deployment"},
+                {"os_family": "Linux", "os": "SUSE", "source_vmware": ["15 SP4", "15 SP3", "15 SP2", "15 SP1", "15 SP0"], "target_azure": ["15 SP4", "15 SP3", "15 SP2", "15 SP1", "15 SP0"], "migration_type": "Re-Host"},
+                {"os_family": "Linux", "os": "SUSE", "source_vmware": ["11 SP4", "11 SP3", "12"], "target_azure": ["15 SP4"], "migration_type": "Clean Deployment"},
+                {"os_family": "Linux", "os": "CentOS", "source_vmware": ["9.x"], "target_azure": ["9.x"], "migration_type": "Re-Host"},
+                {"os_family": "Linux", "os": "CentOS", "source_vmware": ["8.x"], "target_azure": ["RHEL 8.x", "CentOS 9.x"], "migration_type": "Clean Deployment"},
+                {"os_family": "Linux", "os": "CentOS", "source_vmware": ["7.9", "7.7", "7.6", "7.5", "7.4", "6.x"], "target_azure": ["RHEL 8.x", "CentOS 9.x"], "migration_type": "Clean Deployment"},
+                {"os_family": "Linux", "os": "Ubuntu", "source_vmware": ["22.04", "21.04"], "target_azure": ["22.04 LTS"], "migration_type": "Clean Deployment"},
+                {"os_family": "Linux", "os": "Ubuntu", "source_vmware": ["20.04"], "target_azure": ["20.04 LTS"], "migration_type": "Clean Deployment"},
+                {"os_family": "Linux", "os": "Ubuntu", "source_vmware": ["19.04", "19.10", "18.04LTS", "16.04LTS"], "target_azure": ["20.04 LTS"], "migration_type": "Clean Deployment"},
+                {"os_family": "Linux", "os": "Ubuntu", "source_vmware": ["14.04LTS"], "target_azure": ["20.04 LTS"], "migration_type": "Clean Deployment"},
+                {"os_family": "Linux", "os": "Debian", "source_vmware": ["12", "11"], "target_azure": ["12", "11"], "migration_type": "Re-Host"},
+                {"os_family": "Linux", "os": "Debian", "source_vmware": ["10", "9", "8", "7"], "target_azure": ["11"], "migration_type": "Clean Deployment"},
+                {"os_family": "Linux", "os": "Oracle linux", "source_vmware": ["9", "8", "7.7-CI", "7.7"], "target_azure": ["9", "8", "7.7-CI", "7.7"], "migration_type": "Re-Host"},
+                {"os_family": "Linux", "os": "Oracle linux", "source_vmware": ["6"], "target_azure": ["7.7"], "migration_type": "Clean Deployment"},
+                {"os_family": "Linux", "os": "Kali Linux", "source_vmware": ["2016", "2017", "2018", "2019", "2020", "2021", "2022"], "target_azure": ["TBD"], "migration_type": "TBD"},
+                {"os_family": "Windows", "os": "Windows", "source_vmware": ["Windows Server 2003-2012"], "target_azure": ["Windows Server 2016"], "migration_type": "Clean Deployment"},
+                {"os_family": "Windows", "os": "Windows Server 2012r2", "source_vmware": ["Windows Server 2012r2"], "target_azure": ["Windows Server 2012r2"], "migration_type": "Re-Host"},
+                {"os_family": "Windows", "os": "Windows Server 2016", "source_vmware": ["Windows Server 2016"], "target_azure": ["Windows Server 2016"], "migration_type": "Re-Host"},
+                {"os_family": "Windows", "os": "Windows Server 2019", "source_vmware": ["Windows Server 2019"], "target_azure": ["Windows Server 2019"], "migration_type": "Re-Host"},
+                {"os_family": "Windows", "os": "Windows Server 2022", "source_vmware": ["Windows Server 2022"], "target_azure": ["Windows Server 2022"], "migration_type": "Re-Host"}
+              ],
+              "decision_considerations": {
+                "parameters": [
+                  {
+                    "name": "Approach",
+                    "Rehost": "Low-touch: Tool-based migration by servers or subnet, AVS migrations using VMware HCX",
+                    "Replatform": "Medium-touch: Tool-based migration by application",
+                    "Redeploy": "High-touch: Deployment of new servers by application"
+                  },
+                  {
+                    "name": "Effort",
+                    "Rehost": "Simple: Light assessment and planning; minimal application owner involvement",
+                    "Replatform": "Medium: Standard assessment and planning; moderate application owner involvement",
+                    "Redeploy": "Complex: Deep assessment and planning; significant application owner involvement"
+                  },
+                  {
+                    "name": "Planning",
+                    "Rehost": "Tool-based go/no-go decision",
+                    "Replatform": "Guided by an Application Migration Plan",
+                    "Redeploy": "Guided by both an Application Migration Plan and an Application Deployment Plan"
+                  },
+                  {
+                    "name": "Outcomes",
+                    "Rehost": "As-is migration of servers to Azure IaaS or AVS",
+                    "Replatform": "As-is migration of application to Azure IaaS or AVS; OS upgrade available via automation (Complex Application Migration only)",
+                    "Redeploy": "Optimization includes Infrastructure-as-Code, new OS version, and upgraded application components; targeting Azure IaaS, AVS, or PaaS"
+                  },
+                  {
+                    "name": "Databases",
+                    "Rehost": "Databases, if any, migrated as part of server migration",
+                    "Replatform": "Simple/Medium complexity databases migrated to Azure IaaS, AVS, or PaaS",
+                    "Redeploy": "Simple/Medium complexity databases migrated to Azure IaaS, AVS, or PaaS"
+                  },
+                  {
+                    "name": "Migration Velocity",
+                    "Rehost": "Fast: Accelerates migration to Azure IaaS or AVS with little application owner involvement",
+                    "Replatform": "Medium: Migration velocity dependent upon customer resource availability for UAT",
+                    "Redeploy": "Varies: Migration velocity dependent upon customer resource availability for planning/UAT and number of scale components"
+                  },
+                  {
+                    "name": "Scale/High-Availability",
+                    "Rehost": "Direct server migration",
+                    "Replatform": "Direct server migration",
+                    "Redeploy": "Ability to deploy new scaling/HA solution including VM Scale Sets, Availability Zones, etc."
+                  },
+                  {
+                    "name": "UAT/Cutover",
+                    "Rehost": "Simple: Limited to OS health; combined UAT and cutover",
+                    "Replatform": "Medium: Combined UAT and cutover; test failover possible for limited pre-cutover testing",
+                    "Redeploy": "Complex: Full UAT possible prior to cutover event"
+                  },
+                  {
+                    "name": "Target Workloads",
+                    "Rehost": "Best suited to non-production and less critical workloads",
+                    "Replatform": "Best suited to production and important workloads where cutover and UAT can be performed together",
+                    "Redeploy": "Best suited to production and business critical workloads where complex UAT must be performed in advance of cutover"
+                  },
+                  {
+                    "name": "Out of Scope",
+                    "Rehost": "Container to Container Migrations, Highly Complex Applications (e.g., BizTalk, SAP, Teradata, Oracle EBS), Unix systems requiring rewrite, Mainframe OS, Citrix Systems",
+                    "Replatform": "Same as Rehost",
+                    "Redeploy": "Same as Rehost"
+                  }
+                ]
+              }
+            },
+            {
+              "table_name": "",
+              "knowledge": [],
+              "id": "1.3.2 Technology Selection",
+              "prompt": "You are a database modernization and migration expert. For each Oracle database server identified in the application landscape, analyze the source version and recommend the optimal upgrade path to the latest supported version (19c), using the following upgrade matrix as your knowledge base:\n\n- Complexity Small:\n  - 11.2.0.4 \u2192 Direct to 19c\n  - 12.1.0.2 \u2192 Direct to 19c\n  - 12.2.0.1 \u2192 Direct to 19c\n  - 18.1 \u2192 Direct to 19c\n\n- Complexity Medium:\n  - 12.1.0.1 \u2192 12.1.0.2/12.2.0.1 \u2192 19c\n  - 11.2.0.1/0.2/0.3 \u2192 11.2.0.4 \u2192 19c\n  - Criteria: Near path upgrade, more supportability, less functional changes, export/import through data pump is supported, low touch application upgrades/integration may be required, \u22644 environments.\n\n- Complexity Large:\n  - 11.1.0.6/0.7 \u2192 11.2.0.4 \u2192 19c\n  - 10.2.0.2 \u2192 11.2.0.4/12.1.0.2 \u2192 19c\n  - 10.2.0.3/0.4/0.5, 10.1.0.5, 9.2.0.8 \u2192 11.2.0.4 \u2192 19c\n  - Criteria: Far path upgrade, less supportability, more functional changes, export/import through data pump not supported, older version exp & imp support, high touch application upgrades/integration required, >4 environments, or anything Platinum, AMDOCS, SAP.\n\nInstructions:\nFor each Oracle database, identify the source version, determine the recommended upgrade path and complexity, and provide a summary table with columns:\n- Source Version\n- Target Version\n- Upgrade Path\n- Complexity\n- Key Criteria/Notes\n\nIf multiple upgrade paths are possible, recommend the most efficient and supportable route for modernization."
+            },
+            {
+              "table_name": "",
+              "knowledge": [],
+              "id": "1.3.3 Indicative Azure Cost",
+              "prompt": "For each environment provide the Azure cost in a tabular format with the following columns Environment, Cost. The data has to be fetched from Azure Migrate Assessment Report document in the Azure AI search."
+            },
+            {
+              "table_name": "InfrastructureDetails",
+              "knowledge": [],
+              "id": "1.4 Database information",
+              "prompt": "For each environment defined for this application- provide the information about database (if any) in a tabular format with the following columns Environment, Database Name, Database Type (SQL, NoSQL, etc.), Version, Size (GB), Migration Pattern (Rehost, Replatform, Redeploy), Complexity Level (Low, Medium, High). The data has to be fetched from Azure AI search and also the Azure Storage Tables"
+            },
+            {
+              "table_name": "",
+              "knowledge": [],
+              "id": "1.5 Macro Dependencies"
+            },
+            {
+              "table_name": "PrivacyAndSecurity",
+              "knowledge": [],
+              "id": "1.6 Security Considerations",
+              "prompt": "Identify and describe the key security considerations for [Application Name] in the context of its migration to Azure. Include aspects such as data protection, access controls, and compliance requirements."
+            },
+            {
+              "table_name": "",
+              "knowledge": [],
+              "id": "1.7 Resiliency Consideration",
+              "prompt": "Outline the resiliency configurations that should be implemented for [Application Name] in Azure. Include details on high availability, disaster recovery, and backup strategies."
+            },
+            {
+              "table_name": "",
+              "knowledge": [],
+              "id": "1.8 Network Access Requirements",
+              "prompt": "You are a network security and infrastructure architect. I will describe an application deployment scenario, and you must generate a detailed list of network access requirements for this application. The output should clearly specify:\n\n- Allowed protocols\n- Source/destination networks\n- Access restrictions (internal, external, developer/admin)\n- Any special security considerations."
+            },
+            {
+              "table_name": "",
+              "knowledge": [],
+              "id": "1.9 Identity providers",
+              "prompt": "List the identity providers used by the application in a tabular format with the following columns Identity Provider, Type (e.g., SAML, OAuth, OpenID), Usage (e.g., User Authentication, API Access). The data has to be fetched from Azure AI search."
+            },
+            {
+              "table_name": "",
+              "knowledge": [],
+              "id": "1.10 Automation",
+              "prompt": "Does the application use any CI/CD for Application and infrastructure?"
+            },
+            {
+              "table_name": "",
+              "knowledge": [],
+              "id": "1.11 Customer Impact"
+            },
+            {
+              "knowledge": [],
+              "id": "1.12 Operational Concerns"
+            },
+            {
+              "id": "1.13 Migration acceptance Tests"
+            },
+            {
+              "id": "1.14 Observability",
+              "prompt": "Does the application or infrastructure use any monitoring platform or any security vulnerability tool or any other observability tool. List all the details."
+            },
+            {
+              "id": "2 Supporting Documentation",
+              "prompt": "List all the supporting documents available for this application like Architecture diagrams, DR diagrams, Network diagrams, Security documents, Compliance documents, Run books, SOPs etc. from the AI search citations"
+            }
+
+    ]
   
 }
