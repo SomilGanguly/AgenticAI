@@ -129,6 +129,10 @@ async def chat_loop(orchestrator_name: str, application_id: Optional[str] = None
 
     from semantic_kernel.functions import kernel_function
 
+    # Track threads more efficiently - one per agent
+    agent_threads: Dict[str, str] = {}  # agent_id -> thread_id mapping
+    answer_agent_thread_id: Optional[str] = None  # Single persistent thread for answer agent
+    
     # Track the most recent answer-agent thread id for diagnostics
     last_answer_thread_id: Optional[str] = None
     # Track low confidence questions for interactive resolution
@@ -513,23 +517,24 @@ async def chat_loop(orchestrator_name: str, application_id: Optional[str] = None
                 
                 async with DefaultAzureCredential(exclude_shared_token_cache_credential=True) as creds:
                     async with AIProjectClient(credential=creds, endpoint=endpoint) as ai_client:
-                        # Create a thread for this query
-                        thread = await ai_client.agents.threads.create()
-                        try:
-                            ephemeral_thread_ids.add(thread.id)
-                        except Exception:
-                            pass
+                        # Reuse thread for this agent
+                        thread_id = agent_threads.get(agent_id)
+                        if not thread_id:
+                            thread = await ai_client.agents.threads.create()
+                            thread_id = thread.id
+                            agent_threads[agent_id] = thread_id
+                            logger.debug(f"Created persistent thread {thread_id} for agent {agent_id}")
                         
-                        # Send the query
+                        # Send the query using existing thread
                         await ai_client.agents.messages.create(
-                            thread_id=thread.id,
+                            thread_id=thread_id,
                             role="user",
                             content=server_query
                         )
                         
                         # Run and get response
                         run = await ai_client.agents.runs.create(
-                            thread_id=thread.id,
+                            thread_id=thread_id,
                             agent_id=agent_id
                         )
                         
@@ -541,13 +546,13 @@ async def chat_loop(orchestrator_name: str, application_id: Optional[str] = None
                             await asyncio.sleep(1)
                             wait_time += 1
                             run = await ai_client.agents.runs.get(
-                                thread_id=thread.id,
+                                thread_id=thread_id,
                                 run_id=run.id
                             )
                         
                         if run.status == "completed":
                             # Get messages
-                            messages = ai_client.agents.messages.list(thread_id=thread.id)
+                            messages = ai_client.agents.messages.list(thread_id=thread_id)
                             
                             # Parse the assistant's response
                             async for message in messages:
@@ -578,14 +583,8 @@ async def chat_loop(orchestrator_name: str, application_id: Optional[str] = None
                                         logger.error(f"Failed to parse server list from agent response: {parse_ex}")
                                         logger.debug(f"Response content: {content[:500]}")
                         
-                        # Clean up thread explicitly
-                        try:
-                            await ai_client.agents.threads.delete(thread_id=thread.id)
-                        except Exception as _del_ex:
-                            logger.debug(f"Thread delete failed (unique servers): {_del_ex}")
-                
-                logger.warning("Could not extract server list from agent")
-                return []
+                        logger.warning("Could not extract server list from agent")
+                        return []
                 
             except Exception as ex:
                 logger.error(f"Failed to get unique servers from agent: {ex}")
@@ -647,22 +646,45 @@ IMPORTANT:
                 from azure.ai.projects.aio import AIProjectClient
                 from azure.identity.aio import DefaultAzureCredential
                 endpoint = os.environ.get("AZURE_EXISTING_AIPROJECT_ENDPOINT")
+                
                 async with DefaultAzureCredential(exclude_shared_token_cache_credential=True) as creds:
                     async with AIProjectClient(credential=creds, endpoint=endpoint) as ai_client:
-                        thread = await ai_client.agents.threads.create()
+                        # Reuse existing thread for this agent if available
+                        thread_id = agent_threads.get(agent_id)
+                        if not thread_id:
+                            # Create thread only if doesn't exist for this agent
+                            thread = await ai_client.agents.threads.create()
+                            thread_id = thread.id
+                            agent_threads[agent_id] = thread_id
+                            logger.debug(f"Created persistent thread {thread_id} for agent {agent_id}")
+                        else:
+                            logger.debug(f"Reusing thread {thread_id} for agent {agent_id}")
+                        
                         try:
-                            ephemeral_thread_ids.add(thread.id)
-                        except Exception:
-                            pass
-                        try:
-                            await ai_client.agents.messages.create(thread_id=thread.id, role="user", content=query)
-                            run = await ai_client.agents.runs.create(thread_id=thread.id, agent_id=agent_id)
+                            # Skip message clearing to avoid "message not found" errors
+                            # The persistent thread will accumulate context which can be beneficial
+                            # for related queries to the same agent
+                            
+                            await ai_client.agents.messages.create(
+                                thread_id=thread_id, 
+                                role="user", 
+                                content=query
+                            )
+                            run = await ai_client.agents.runs.create(
+                                thread_id=thread_id, 
+                                agent_id=agent_id
+                            )
+                            
                             import asyncio
                             while run.status in ["queued", "in_progress", "requires_action"]:
                                 await asyncio.sleep(1)
-                                run = await ai_client.agents.runs.get(thread_id=thread.id, run_id=run.id)
+                                run = await ai_client.agents.runs.get(
+                                    thread_id=thread_id, 
+                                    run_id=run.id
+                                )
+                            
                             if run.status == "completed":
-                                messages = ai_client.agents.messages.list(thread_id=thread.id)
+                                messages = ai_client.agents.messages.list(thread_id=thread_id)
                                 async for message in messages:
                                     if message.role == "assistant":
                                         content = message.content[0].text.value if message.content else ""
@@ -679,11 +701,9 @@ IMPORTANT:
                                                     return self._parse_dependency_text(response_text, server_name)
                                         except Exception:
                                             return self._parse_dependency_text(content, server_name)
-                        finally:
-                            try:
-                                await ai_client.agents.threads.delete(thread_id=thread.id)
-                            except Exception as _del_ex:
-                                logger.debug(f"Thread delete failed (dependency query {server_name}): {_del_ex}")
+                        except Exception as ex:
+                            logger.error(f"Query failed for {server_name}: {ex}")
+                            # Don't delete thread on error - keep for reuse
             except Exception as ex:
                 logger.error(f"Failed to query dependencies for {server_name}: {ex}")
             return []
@@ -1525,7 +1545,7 @@ IMPORTANT:
         }
 
     async def _process_questions_for_table(client_obj, agent_id: str, table_name: str, partition_key: str) -> dict:
-        """Process all questions for a specific table and calculate confidence scores."""
+        """Process all questions for a specific table using single persistent thread."""
         try:
             from azure.data.tables import TableServiceClient, UpdateMode as TableUpdateMode
             from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
@@ -1550,12 +1570,25 @@ IMPORTANT:
         server_filter = f"PartitionKey eq '{escaped_pk}'"
         entities = list(tc.query_entities(query_filter=server_filter))
         
+        # Get or create persistent thread for answer agent
+        nonlocal answer_agent_thread_id
+        
+        if not answer_agent_thread_id:
+            # Create a single thread for all Q&A processing
+            thread = await client_obj.agents.threads.create()
+            answer_agent_thread_id = thread.id
+            agent_threads[agent_id] = answer_agent_thread_id
+            logger.debug(f"Created persistent Q&A thread: {answer_agent_thread_id}")
+        
         # Get agent
         try:
             agent_def = await client_obj.agents.get_agent(agent_id)
             answer_agent = SKAgent(client=client_obj, definition=agent_def)
         except Exception as ex:
             return {"result": "error", "message": f"Wrap agent failed: {ex}"}
+
+        # Use the existing thread directly - no need for wrapper
+        qa_thread = None  # Will use the thread in get_response calls
 
         answered = 0
         low_conf_count = 0
@@ -1567,18 +1600,53 @@ IMPORTANT:
                 continue
             
             try:
-                # Get response from agent
-                resp = await answer_agent.get_response(messages=q, thread=None)
-                # Track and schedule deletion of any underlying thread if available
+                # Skip message clearing to avoid "message not found" errors
+                # The persistent thread will maintain conversation context
+                # which can actually be beneficial for related questions
+                
+                # Get response using persistent thread via direct API calls
                 try:
-                    resp_thread = getattr(resp, 'thread', None)
-                    resp_thread_id = getattr(resp_thread, 'id', None)
-                    if resp_thread_id:
-                        ephemeral_thread_ids.add(resp_thread_id)
-                except Exception:
-                    pass
-                text = str(resp).strip()
-                logger.debug(f"Agent response for '{q[:50]}...': in table {table_name}: {text[:200]}")
+                    # Add message to persistent thread
+                    await client_obj.agents.messages.create(
+                        thread_id=answer_agent_thread_id,
+                        role="user",
+                        content=q
+                    )
+                    
+                    # Create run
+                    run = await client_obj.agents.runs.create(
+                        thread_id=answer_agent_thread_id,
+                        agent_id=agent_id
+                    )
+                    
+                    # Wait for completion
+                    import asyncio
+                    while run.status in ["queued", "in_progress", "requires_action"]:
+                        await asyncio.sleep(1)
+                        run = await client_obj.agents.runs.get(
+                            thread_id=answer_agent_thread_id,
+                            run_id=run.id
+                        )
+                    
+                    if run.status == "completed":
+                        # Get the assistant's response
+                        messages = client_obj.agents.messages.list(thread_id=answer_agent_thread_id)
+                        text = ""
+                        async for message in messages:
+                            if message.role == "assistant":
+                                text = message.content[0].text.value if message.content else ""
+                                break
+                    else:
+                        text = f"Run failed with status: {run.status}"
+                        
+                except Exception as run_ex:
+                    logger.error(f"Direct API call failed for question: {run_ex}")
+                    # Fallback to original method without persistent thread
+                    resp = await answer_agent.get_response(messages=q, thread=None)
+                    text = str(resp).strip()
+                
+                text = text.strip()
+                logger.debug(f"Agent response for '{q[:50]}...': {text[:200]}")
                 
                 # Capture thread id
                 try:
@@ -2172,27 +2240,40 @@ IMPORTANT:
                         print(f"Assistant error: {ex}")
                         
             finally:
-                # Cleanup resources (threads + agents) if enabled
+                # Cleanup resources - simplified thread deletion
                 if cleanup and os.getenv("APP_CLEANUP_ON_EXIT", "true").lower() in {"1", "true", "yes", "on"}:
                     print("\nInitiating cleanup of threads and agents ...")
-                    # Delete chat loop thread (Semantic Kernel thread wrapper)
+                    
+                    # Delete main orchestrator thread
                     try:
                         if thread and getattr(thread, "id", None):
                             await client.agents.threads.delete(thread_id=thread.id)
-                            print(f"  ✓ Deleted main interaction thread: {thread.id}")
+                            print(f"  ✓ Deleted main orchestrator thread: {thread.id}")
                     except Exception as ex:
                         print(f"  ⚠ Could not delete main thread: {ex}")
-
-                    # Delete ephemeral threads created during dependency / infrastructure extraction
+                    
+                    # Delete all persistent agent threads
                     deleted_threads = 0
-                    for t_id in list(ephemeral_thread_ids):
+                    for agent_id, thread_id in agent_threads.items():
                         try:
-                            await client.agents.threads.delete(thread_id=t_id)
+                            await client.agents.threads.delete(thread_id=thread_id)
                             deleted_threads += 1
+                            logger.debug(f"Deleted thread {thread_id} for agent {agent_id}")
                         except Exception:
                             pass
                     if deleted_threads:
-                        print(f"  ✓ Deleted {deleted_threads} ephemeral threads")
+                        print(f"  ✓ Deleted {deleted_threads} agent threads")
+
+                    # Delete ephemeral threads created during dependency / infrastructure extraction
+                    ephemeral_deleted = 0
+                    for t_id in list(ephemeral_thread_ids):
+                        try:
+                            await client.agents.threads.delete(thread_id=t_id)
+                            ephemeral_deleted += 1
+                        except Exception:
+                            pass
+                    if ephemeral_deleted:
+                        print(f"  ✓ Deleted {ephemeral_deleted} ephemeral threads")
 
                     # Delete answer agents (intake agents) gathered during session
                     deleted_agents = 0
@@ -2204,7 +2285,7 @@ IMPORTANT:
                         except Exception as ex:
                             print(f"  ⚠ Could not delete answer agent {a_id}: {ex}")
 
-                    # Delete orchestrator agent last
+                    # Delete orchestrator agent
                     try:
                         if agent_definition and getattr(agent_definition, "id", None):
                             await client.agents.delete_agent(agent_id=agent_definition.id)
