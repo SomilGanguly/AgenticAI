@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 
 from logging_config import configure_logging
 from intake_agent import ensure_agent
+from asr_agent_latest import run_asr_agent
 
 
 load_dotenv()
@@ -2118,6 +2119,43 @@ IMPORTANT:
             print(f"\n=== Setup Complete ===")
             print(f"Orchestrator ready. Type 'help' for available commands or 'exit' to quit.\n")
             
+            # Run ASR Agent after setup completion
+            print(f"\n=== Running ASR Agent ===")
+            print(f"Invoking ASR Agent for Application ID: {application_id}")
+            try:
+                # Get the thread ID from agent_threads and create an AzureAIAgentThread object
+                thread_id = agent_threads.get(agent_id) or answer_agent_thread_id
+                asr_thread = None
+                
+                if thread_id:
+                    # Create AzureAIAgentThread object from existing thread ID
+                    asr_thread = AzureAIAgentThread(client=client, thread_id=thread_id)
+                    print(f"Using existing thread ID: {thread_id}")
+                else:
+                    print("No existing thread found, ASR agent will create a new one")
+                
+                asr_result = await run_asr_agent(application_id, client, asr_thread)
+                if asr_result.get("status") == "success":
+                    print(f"✓ ASR Agent execution completed successfully")
+                    print(f"  - Agent ID: {asr_result.get('agent_id')}")
+                    print(f"  - Output file: {asr_result.get('output_file')}")
+                    print(f"  - Markdown file: {asr_result.get('markdown_file')}")
+                    print(f"  - Blob URL: {asr_result.get('blob_url')}")
+                    
+                    # Store ASR agent ID for cleanup
+                    if asr_result.get('agent_id'):
+                        answer_agent_ids.add(asr_result.get('agent_id'))
+                    
+                    # Update thread if ASR agent created/used one
+                    if asr_result.get('thread'):
+                        thread = asr_result.get('thread')
+                        
+                else:
+                    print(f"⚠ ASR Agent execution failed: {asr_result.get('message', 'Unknown error')}")
+            except Exception as ex:
+                print(f"⚠ Error running ASR Agent: {str(ex)}")
+            print(f"=== ASR Agent Complete ===\n")
+            
             # Interactive loop
             try:
                 while True:
@@ -2140,7 +2178,8 @@ IMPORTANT:
                         print("  /status - Show current status")
                         print("  /qasummary - Show Q&A summary")
                         print("  help - Show this help")
-                        print("  exit - Quit the application\n")
+                        print("  exit - Quit the application")
+                        print("\nNote: ASR (Application Summary Report) agent has already been executed during setup.\n")
                         continue
                     
                     # Reindex command

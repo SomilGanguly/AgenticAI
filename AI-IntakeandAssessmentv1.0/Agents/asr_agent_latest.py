@@ -141,12 +141,19 @@ async def handle_streaming_intermediate_steps(message: ChatMessageContent) -> No
             print(f"{item}")
 
 
-async def main() -> None:
-    async with (
-        AzureCliCredential() as creds,
-        AzureAIAgent.create_client(credential=creds) as client,
-    ):
-        application_id = "2007"
+async def run_asr_agent(application_id: str, client, thread=None) -> dict:
+    """
+    Run the ASR agent with the provided application ID and thread.
+    
+    Args:
+        application_id: The application ID to process
+        client: The Azure AI client
+        thread: Optional thread to use (if None, a new one will be created)
+    
+    Returns:
+        dict: Result containing status, output files, and blob URL
+    """
+    try:
         # 2. Create the agent if it does not exist
         #track_event_if_configured("AsrAgentCreating", {"agent_name": agent_name})
         index_name = f"{application_id}"
@@ -160,7 +167,7 @@ async def main() -> None:
         project_index = await client.indexes.create_or_update(
             name=index_name,
             version=index_version,
-            body={
+            index={
                 "connectionName": "mgassessearch",
                 "indexName": index_name,
                 "type": "AzureSearch",
@@ -194,94 +201,124 @@ async def main() -> None:
             #plugins=[AsrPromptPlugin()],  # Add the plugin to the agent
         )
 
-        # 3. Create a thread for the agent
+        # 3. Use provided thread or create new one
         # If no thread is provided, a new thread will be
         # created and returned with the initial response
-        thread = None
 
-        try:
-            import json
-            prompt_file = "asr_prompt.json"
-            app_id = application_id
-            # Load prompts and table names
-            with open(prompt_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            sections = data.get("sections_array", [])
-            responses = []
-            for section in sections:
-                prompt = section.get("prompt", "")
-                table_name = section.get("table_name", "")
-                if not prompt:
-                    responses.append("")
-                    continue
-                # Query table data for this prompt if table_name is set
-                table_data = []
-                if table_name:
-                    try:
-                        table_data = get_tables_and_data(app_id, table_name)
-                    except Exception as e:
-                        table_data = [{"error": str(e)}]
-                # Compose the message for the agent: prompt + table data context
-                if table_data:
-                    user_message = f"{prompt}\n\nTable Data (for context):\n{json.dumps(table_data, indent=2)}"
-                else:
-                    user_message = prompt
-                print(f"# User: {user_message}")
-                # Invoke the agent for this prompt only
-                async for response in agent.invoke(
-                    messages=user_message,
-                    thread=thread,
-                    on_intermediate_message=handle_streaming_intermediate_steps,
-                    parallel_tool_calls=False,
-                    timeout=120
-                ):
-                    print(f"# {response.name}: {response}")
-                    thread = response.thread
-                    responses.append(str(response))
-                    break  # Only one response per prompt
-            # Save responses to responses-{app_id}.json
-            result = create_response_file(responses, prompt_file, app_id)
-            if result.get("status") == "success":
-                responses_json_path = result.get("output_file")
-                md_path = responses_json_to_markdown(responses_json_path, app_id)
-                print(f"Markdown file created: {md_path}")
-
-                # Upload to blob storage, handle versioning if file exists
-                version = 1
-                base_md_path = md_path
-                file_name = os.path.basename(md_path)
-                file_root, file_ext = os.path.splitext(file_name)
-                container_files = []
+        import json
+        prompt_file = "asr_prompt.json"
+        app_id = application_id
+        
+        # Check if prompt file exists
+        if not os.path.exists(prompt_file):
+            return {"status": "error", "message": f"Prompt file {prompt_file} not found"}
+        
+        # Load prompts and table names
+        with open(prompt_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        sections = data.get("sections_array", [])
+        responses = []
+        
+        for section in sections:
+            prompt = section.get("prompt", "")
+            table_name = section.get("table_name", "")
+            if not prompt:
+                responses.append("")
+                continue
+            # Query table data for this prompt if table_name is set
+            table_data = []
+            if table_name:
                 try:
-                    from azure.storage.blob import BlobServiceClient
-                    account_url = os.getenv("AZURE_BLOB_ACCOUNT_URL") or os.getenv("AZURE_STORAGE_ACCOUNT_URL") or os.getenv("AZURE_TABLES_ACCOUNT_URL") or os.getenv("AZURE_TABLE_ACCOUNT_URL")
-                    if account_url:
-                        account_url = account_url.strip()
-                    account_name = os.getenv("AZURE_STORAGE_ACCOUNT_NAME")
-                    if not account_url and account_name:
-                        account_url = f"https://{account_name}.blob.core.windows.net"
-                    credential = DefaultAzureCredential(exclude_shared_token_cache_credential=True)
-                    blob_service = BlobServiceClient(account_url, credential=credential)
-                    container_name = str(app_id).lower()
-                    container_client = blob_service.get_container_client(container_name)
-                    # List blobs in the container
-                    container_files = [b.name for b in container_client.list_blobs()]
-                except Exception:
-                    pass
-                new_file_name = file_name
-                while new_file_name in container_files:
-                    version += 1
-                    new_file_name = f"{file_root}_v{version}{file_ext}"
-                if new_file_name != file_name:
-                    # Copy to new versioned file
-                    new_md_path = os.path.join(os.path.dirname(md_path), new_file_name)
-                    import shutil
-                    shutil.copy(md_path, new_md_path)
-                    md_path = new_md_path
-                blob_url = upload_file_to_container(md_path, app_id, new_file_name)
-                print(f"Markdown file uploaded to blob storage: {blob_url}")
-        finally:
-            print("processing done")
+                    table_data = get_tables_and_data(app_id, table_name)
+                except Exception as e:
+                    table_data = [{"error": str(e)}]
+            # Compose the message for the agent: prompt + table data context
+            if table_data:
+                user_message = f"{prompt}\n\nTable Data (for context):\n{json.dumps(table_data, indent=2)}"
+            else:
+                user_message = prompt
+            print(f"# User: {user_message}")
+            # Invoke the agent for this prompt only
+            async for response in agent.invoke(
+                messages=user_message,
+                thread=thread,
+                on_intermediate_message=handle_streaming_intermediate_steps,
+                parallel_tool_calls=False,
+                timeout=120
+            ):
+                print(f"# {response.name}: {response}")
+                thread = response.thread
+                responses.append(str(response))
+                break  # Only one response per prompt
+        
+        # Save responses to responses-{app_id}.json
+        result = create_response_file(responses, prompt_file, app_id)
+        if result.get("status") == "success":
+            responses_json_path = result.get("output_file")
+            md_path = responses_json_to_markdown(responses_json_path, app_id)
+            print(f"Markdown file created: {md_path}")
+
+            # Upload to blob storage, handle versioning if file exists
+            version = 1
+            base_md_path = md_path
+            file_name = os.path.basename(md_path)
+            file_root, file_ext = os.path.splitext(file_name)
+            container_files = []
+            try:
+                from azure.storage.blob import BlobServiceClient
+                account_url = os.getenv("AZURE_BLOB_ACCOUNT_URL") or os.getenv("AZURE_STORAGE_ACCOUNT_URL") or os.getenv("AZURE_TABLES_ACCOUNT_URL") or os.getenv("AZURE_TABLE_ACCOUNT_URL")
+                if account_url:
+                    account_url = account_url.strip()
+                account_name = os.getenv("AZURE_STORAGE_ACCOUNT_NAME")
+                if not account_url and account_name:
+                    account_url = f"https://{account_name}.blob.core.windows.net"
+                credential = DefaultAzureCredential(exclude_shared_token_cache_credential=True)
+                blob_service = BlobServiceClient(account_url, credential=credential)
+                container_name = str(app_id).lower()
+                container_client = blob_service.get_container_client(container_name)
+                # List blobs in the container
+                container_files = [b.name for b in container_client.list_blobs()]
+            except Exception:
+                pass
+            new_file_name = file_name
+            while new_file_name in container_files:
+                version += 1
+                new_file_name = f"{file_root}_v{version}{file_ext}"
+            if new_file_name != file_name:
+                # Copy to new versioned file
+                new_md_path = os.path.join(os.path.dirname(md_path), new_file_name)
+                import shutil
+                shutil.copy(md_path, new_md_path)
+                md_path = new_md_path
+            blob_url = upload_file_to_container(md_path, app_id, new_file_name)
+            print(f"Markdown file uploaded to blob storage: {blob_url}")
+            
+            return {
+                "status": "success", 
+                "agent_id": agent_definition.id,
+                "thread": thread,
+                "output_file": responses_json_path,
+                "markdown_file": md_path,
+                "blob_url": blob_url
+            }
+        else:
+            return {"status": "error", "message": "Failed to create response file"}
+            
+    except Exception as e:
+        print(f"Error in ASR agent execution: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+
+async def main() -> None:
+    """Main function for standalone execution"""
+    async with (
+        AzureCliCredential() as creds,
+        AzureAIAgent.create_client(credential=creds) as client,
+    ):
+        application_id = "2007"
+        result = await run_asr_agent(application_id, client)
+        print(f"ASR Agent execution result: {result}")
+        print("processing done")
 
 
 
