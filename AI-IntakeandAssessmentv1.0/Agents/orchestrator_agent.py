@@ -7,6 +7,8 @@ import os
 import sys
 import aiohttp
 import asyncio
+import re
+import hashlib
 
 from dotenv import load_dotenv
 
@@ -49,6 +51,76 @@ def check_index_exists(index_name: str) -> Optional[bool]:
             return False
         logger.warning("Index existence check failed: %s", ex)
         return None
+
+
+def _sanitize_index_name(app_id: str) -> str:
+    """Convert arbitrary appId to a valid Azure AI Search index name.
+    
+    Rules: lowercase, alphanumerics or dashes; must start/end with alphanumeric; length 2-128.
+    Matches the same logic used in the indexer function.
+    """
+    import re
+    import hashlib
+    
+    base = app_id.lower().strip()
+    base = re.sub(r"[^a-z0-9-]", "-", base)            # invalid chars -> dash
+    base = re.sub(r"-+", "-", base)                     # collapse dashes
+    base = base.strip("-")                              # trim
+    if not base or not base[0].isalnum():
+        base = f"app-{hashlib.sha1(app_id.encode()).hexdigest()[:8]}"
+    if len(base) < 2:
+        base = (base + "ix")[:2]
+    if len(base) > 128:
+        base = base[:128]
+    return base
+
+
+def delete_search_index(app_id: str) -> bool:
+    """Delete the search index for the given application ID.
+    
+    Returns True if successfully deleted, False otherwise.
+    Uses the same naming convention as the indexer function.
+    """
+    try:
+        svc_endpoint = os.getenv("AZURE_SEARCH_SERVICE_ENDPOINT") or os.getenv("AZURE_SEARCH_ENDPOINT")
+        if not svc_endpoint:
+            logger.warning("AZURE_SEARCH_SERVICE_ENDPOINT (or AZURE_SEARCH_ENDPOINT) is not set; cannot delete index.")
+            return False
+
+        api_key = os.getenv("AZURE_SEARCH_API_KEY") or os.getenv("AZURE_SEARCH_ADMIN_KEY")
+        from azure.search.documents.indexes import SearchIndexClient
+        
+        if api_key:
+            from azure.core.credentials import AzureKeyCredential
+            credential = AzureKeyCredential(api_key)
+        else:
+            from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
+            credential = SyncDefaultAzureCredential(exclude_shared_token_cache_credential=True)
+
+        # Use the same naming logic as the indexer
+        index_name = _sanitize_index_name(app_id)
+        
+        sic = SearchIndexClient(endpoint=svc_endpoint, credential=credential)
+        
+        # Check if index exists before attempting to delete
+        try:
+            sic.get_index(index_name)
+        except Exception as ex:
+            if ex.__class__.__name__ == "ResourceNotFoundError":
+                logger.debug(f"Index '{index_name}' does not exist, nothing to delete")
+                return True  # Consider this a success since the goal is achieved
+            else:
+                logger.error(f"Error checking index existence: {ex}")
+                return False
+        
+        # Delete the index
+        sic.delete_index(index_name)
+        logger.debug(f"Successfully deleted search index: {index_name}")
+        return True
+        
+    except Exception as ex:
+        logger.error(f"Failed to delete search index for app_id '{app_id}': {ex}")
+        return False
 
 
 async def trigger_indexing_function(app_id: str, container_name: str) -> Dict[str, Any]:
@@ -880,19 +952,23 @@ IMPORTANT:
                 endpoint = os.environ.get("AZURE_EXISTING_AIPROJECT_ENDPOINT")
                 async with DefaultAzureCredential(exclude_shared_token_cache_credential=True) as creds:
                     async with AIProjectClient(credential=creds, endpoint=endpoint) as ai_client:
-                        thread = await ai_client.agents.threads.create()
-                        try:
-                            ephemeral_thread_ids.add(thread.id)
-                        except Exception:
-                            pass
+                        thread_id = agent_threads.get(agent_id)
+                        if not thread_id:
+                            # Create thread only if doesn't exist for this agent
+                            thread = await ai_client.agents.threads.create()
+                            thread_id = thread.id
+                            agent_threads[agent_id] = thread_id
+                            logger.debug(f"Created persistent thread {thread_id} for agent {agent_id}")
+                        else:
+                            logger.debug(f"Reusing thread {thread_id} for agent {agent_id}")
                         try:
                             await ai_client.agents.messages.create(
-                                thread_id=thread.id,
+                                thread_id=thread_id,
                                 role="user",
                                 content=query
                             )
                             run = await ai_client.agents.runs.create(
-                                thread_id=thread.id,
+                                thread_id=thread_id,
                                 agent_id=agent_id
                             )
                             import asyncio
@@ -902,11 +978,11 @@ IMPORTANT:
                                 await asyncio.sleep(1)
                                 wait_time += 1
                                 run = await ai_client.agents.runs.get(
-                                    thread_id=thread.id,
+                                    thread_id=thread_id,
                                     run_id=run.id
                                 )
                             if run.status == "completed":
-                                messages = ai_client.agents.messages.list(thread_id=thread.id)
+                                messages = ai_client.agents.messages.list(thread_id=thread_id)
                                 async for message in messages:
                                     if message.role == "assistant":
                                         content = message.content[0].text.value if message.content else ""
@@ -927,11 +1003,8 @@ IMPORTANT:
                                             "Confidence": 0.3,
                                             "Citation": "Could not parse infrastructure data"
                                         }
-                        finally:
-                            try:
-                                await ai_client.agents.threads.delete(thread_id=thread.id)
-                            except Exception as _del_ex:
-                                logger.debug(f"Thread delete failed (infrastructure query {server_name}): {_del_ex}")
+                        except Exception as ex:
+                            logger.error(f"Query failed for {server_name}: {ex}")
             except Exception as ex:
                 logger.error(f"Failed to query infrastructure for {server_name}: {ex}")
                 return {}
@@ -2177,6 +2250,7 @@ IMPORTANT:
                         print("  /resolvelow - Resolve low confidence questions")
                         print("  /status - Show current status")
                         print("  /qasummary - Show Q&A summary")
+                        print("  /deleteindex - Delete the search index for this application")
                         print("  help - Show this help")
                         print("  exit - Quit the application")
                         print("\nNote: ASR (Application Summary Report) agent has already been executed during setup.\n")
@@ -2270,6 +2344,30 @@ IMPORTANT:
                         print(f"QA summary: {summary_result}")
                         continue
                     
+                    # Delete Index command
+                    if user_input.startswith("/deleteindex"):
+                        try:
+                            index_name = _sanitize_index_name(application_id)
+                            # Check if index exists
+                            index_exists = check_index_exists(index_name)
+                            
+                            if index_exists:
+                                confirm = input(f"Are you sure you want to delete the search index '{index_name}'? (yes/no): ").strip().lower()
+                                if confirm in {"yes", "y"}:
+                                    if delete_search_index(application_id):
+                                        print(f"✓ Successfully deleted search index: {index_name}")
+                                    else:
+                                        print(f"✗ Failed to delete search index: {index_name}")
+                                else:
+                                    print("Index deletion cancelled.")
+                            elif index_exists is False:
+                                print(f"Search index '{index_name}' does not exist.")
+                            else:
+                                print(f"Could not verify if search index '{index_name}' exists.")
+                        except Exception as ex:
+                            print(f"Error during index deletion: {ex}")
+                        continue
+                    
                     # Normal chat
                     try:
                         response = await agent.get_response(messages=user_input, thread=thread)
@@ -2282,6 +2380,34 @@ IMPORTANT:
                 # Cleanup resources - simplified thread deletion
                 if cleanup and os.getenv("APP_CLEANUP_ON_EXIT", "true").lower() in {"1", "true", "yes", "on"}:
                     print("\nInitiating cleanup of threads and agents ...")
+                    
+                    # Ask user for confirmation before deleting the search index
+                    delete_index_confirmed = False
+                    try:
+                        index_name = _sanitize_index_name(application_id)
+                        # Check if index exists before asking for confirmation
+                        index_exists = check_index_exists(index_name)
+                        
+                        if index_exists:
+                            delete_index_confirmed = True
+                        elif index_exists is False:
+                            print(f"  ℹ Search index '{index_name}' does not exist or was already deleted")
+                        else:
+                            print(f"  ⚠ Could not verify if search index '{index_name}' exists")
+                    except KeyboardInterrupt:
+                        print("\n  Skipping index deletion confirmation...")
+                        delete_index_confirmed = False
+                    except Exception as ex:
+                        logger.warning(f"Error during index deletion confirmation: {ex}")
+                        delete_index_confirmed = False
+                    
+                    # Delete search index if confirmed
+                    if delete_index_confirmed:
+                        print(f"  Deleting search index '{index_name}'...")
+                        if delete_search_index(application_id):
+                            print(f"  ✓ Deleted search index: {index_name}")
+                        else:
+                            print(f"  ⚠ Failed to delete search index: {index_name}")
                     
                     # Delete main orchestrator thread
                     try:
