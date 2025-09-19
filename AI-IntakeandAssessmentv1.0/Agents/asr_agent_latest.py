@@ -9,7 +9,6 @@ from typing import Annotated, List
 from dotenv import load_dotenv
 from azure.ai.agents.models import AzureAISearchTool, AzureAISearchQueryType
 from azure.identity.aio import AzureCliCredential
-from azure.data.tables import TableServiceClient
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient, ContentSettings
 from semantic_kernel.agents import AzureAIAgent, AzureAIAgentSettings, AzureAIAgentThread
@@ -104,32 +103,9 @@ def create_response_file(responses: list, prompt_file: str, app_id: str) -> dict
 
 
 
-# Standalone function to fetch table data for a given app_id and table_name
-def get_tables_and_data(app_id: str, table_name: str) -> list:
-    """
-    Query the Azure Storage table whose name starts with table_name and ends with app_id. Returns all entities from that table as a JSON list.
-    """
-    ACCOUNT_URL = os.getenv("AZURE_TABLES_ACCOUNT_URL") or os.getenv("AZURE_TABLE_ACCOUNT_URL")
-    if ACCOUNT_URL:
-        ACCOUNT_URL = ACCOUNT_URL.strip()
-    ACCOUNT_NAME = os.getenv("AZURE_STORAGE_ACCOUNT_NAME")
-    if not ACCOUNT_URL and ACCOUNT_NAME:
-        ACCOUNT_URL = f"https://{ACCOUNT_NAME}.table.core.windows.net"
-    credential = DefaultAzureCredential(exclude_shared_token_cache_credential=True)
-    table_service = TableServiceClient(endpoint=ACCOUNT_URL, credential=credential)
-
-    suffix = str(app_id).lower()
-    prefix = table_name.lower()
-    for table_item in table_service.list_tables():
-        tname = table_item.name.lower()
-        if tname.startswith(prefix) and tname.endswith(suffix):
-            try:
-                table_client = table_service.get_table_client(table_item.name)
-                entities = list(table_client.list_entities())
-                return entities
-            except Exception as e:
-                return [{"error": str(e)}]
-    return []
+"""The ASR agent now relies solely on the unified search index that already contains
+exported table rows (via JSONL snapshot) and uploaded documents. Direct table reads
+have been removed to avoid duplication and reduce latency."""
 
 async def handle_streaming_intermediate_steps(message: ChatMessageContent) -> None:
     for item in message.items or []:
@@ -191,7 +167,13 @@ async def run_asr_agent(application_id: str, client, thread=None) -> dict:
             tool_resources=ai_search.resources,
             tools=ai_search.definitions,
             name=agent_name,
-            instructions="You are a migration expert. You need to answers from the AI search tool attached and also based on the table context passed along with the prompts. Do not use your own knowledge. If you do not find any answer in the tool, say 'No relevant information found in the provided data.'",
+            instructions=(
+                "You are a migration expert generating an Application Summary Report. "
+                "Use ONLY the attached Azure AI Search tool for answers. The index already contains "
+                "(a) uploaded source documents and (b) exported application tables flattened into JSONL with fields like _SourceTable and Key. "
+                "Do not request external knowledge or fabricate data. For each prompt, perform focused search queries; if information is missing, reply exactly: 'No relevant information found in the provided data.' "
+                "Cite sources briefly if available (document name or _SourceTable + RowKey)."
+            ),
         )
 
         # 2. Create a Semantic Kernel agent for the Azure AI agent
@@ -221,20 +203,18 @@ async def run_asr_agent(application_id: str, client, thread=None) -> dict:
         
         for section in sections:
             prompt = section.get("prompt", "")
-            table_name = section.get("table_name", "")
+            # table_name field no longer used; retained in JSON for backward compatibility
             if not prompt:
                 responses.append("")
                 continue
-            # Query table data for this prompt if table_name is set
-            table_data = []
-            if table_name:
-                try:
-                    table_data = get_tables_and_data(app_id, table_name)
-                except Exception as e:
-                    table_data = [{"error": str(e)}]
-            # Compose the message for the agent: prompt + table data context
-            if table_data:
-                user_message = f"{prompt}\n\nTable Data (for context):\n{json.dumps(table_data, indent=2)}"
+            # Augment prompt with explicit guidance to search (idempotent, avoids duplicating if already added)
+            guidance_suffix = (
+                "\n\nInstructions: Use the search tool to retrieve only relevant facts. "
+                "Search iteratively if needed. Base all content strictly on retrieved passages. "
+                "If nothing is found, respond with: No relevant information found in the provided data."
+            )
+            if guidance_suffix not in prompt:
+                user_message = prompt + guidance_suffix
             else:
                 user_message = prompt
             print(f"# User: {user_message}")

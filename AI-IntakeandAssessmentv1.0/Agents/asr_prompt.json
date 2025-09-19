@@ -4,20 +4,20 @@
             {
               "knowledge": [],
               "id": "1. Application Overview",
-              "prompt": "Provide a structured summary of the application lifecycle and environment classification for Customer Rewards portal. Include the following details for each environment (Dev, SIT, Test, PAT, Pre-Prod, Production):\n\nBusiness Criticality\nService Category\nInformation Classification\n\nAlso include the overall application-level classification. Format the output as a table with columns for:\n\nEnvironment\nBusiness Criticality\nService Category\nInformation Classification",
-              "table_name": "AppDetails"
+              "prompt": "Using ONLY the indexed documents and exported table snapshot records (_SourceTable=AppDetails*), provide a structured summary of the application lifecycle and environment classification for the application. For each environment (Dev, SIT, Test, PAT, Pre-Prod, Production) extract: Business Criticality, Service Category, Information Classification. Include an overall application classification. Output a markdown table with columns: Environment | Business Criticality | Service Category | Information Classification. If any value is not found write '-' .",
+              "table_name": null
             },
             {
               "knowledge": [],
               "id": "1.1 Key Business Drivers",
-              "prompt": "List and describe the key business drivers for [Application Name]. Include at least three drivers, explaining their importance to the business and how they impact the application's development and maintenance.",
-              "table_name": "AppDetails"
+              "prompt": "From the search index (look at _SourceTable=AppDetails* rows and any business overview documents), list at least three key business drivers. For each: Driver | Description | Source (cite doc name or _SourceTable+RowKey). If none found respond 'No relevant information found in the provided data.'",
+              "table_name": null
             },
             {
               "knowledge": [],
               "id": "1.2 Key Contacts",
-              "prompt": "Provide a structured list of key contacts supporting the migration of [Application Name] to Azure. For each contact, include: Full Name, Email Address, Title or Role. Format the output as a table with columns: Full Name, Email, Title.",
-              "table_name": "AppDetails"
+              "prompt": "Using only indexed content (_SourceTable=AppDetails* rows or documents), extract key migration contacts. Output table: Full Name | Email | Title/Role | Source. If none found say 'No relevant information found in the provided data.'",
+              "table_name": null
             },
             {
               "table_name": "",
@@ -129,10 +129,10 @@
               "prompt": "For each environment provide the Azure cost in a tabular format with the following columns Environment, Cost. The data has to be fetched from Azure Migrate Assessment Report document in the Azure AI search."
             },
             {
-              "table_name": "InfrastructureDetails",
+              "table_name": null,
               "knowledge": [],
               "id": "1.4 Database information",
-              "prompt": "For each environment defined for this application- provide the information about database (if any) in a tabular format with the following columns Environment, Database Name, Database Type (SQL, NoSQL, etc.), Version, Size (GB), Migration Pattern (Rehost, Replatform, Redeploy), Complexity Level (Low, Medium, High). The data has to be fetched from Azure AI search and also the Azure Storage Tables"
+              "prompt": "From the indexed data (including rows where _SourceTable contains 'InfrastructureDetails' or DB related docs) compile database info per environment. Output table: Environment | Database Name | Type | Version | Size (GB) | Migration Pattern | Complexity | Source. Use '-' if unknown."
             },
             {
               "table_name": "",
@@ -140,10 +140,10 @@
               "id": "1.5 Macro Dependencies"
             },
             {
-              "table_name": "PrivacyAndSecurity",
+              "table_name": null,
               "knowledge": [],
               "id": "1.6 Security Considerations",
-              "prompt": "Identify and describe the key security considerations for [Application Name] in the context of its migration to Azure. Include aspects such as data protection, access controls, and compliance requirements."
+              "prompt": "Identify key security considerations (data protection, access controls, compliance) using only indexed security/privacy records (_SourceTable=PrivacyAndSecurity* or related docs). Provide concise bullet list; each bullet ends with a source in parentheses."
             },
             {
               "table_name": "",

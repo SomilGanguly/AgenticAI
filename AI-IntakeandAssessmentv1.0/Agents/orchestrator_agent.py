@@ -6,6 +6,11 @@ import logging
 import os
 import sys
 import aiohttp
+from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
+try:
+    from azure.keyvault.secrets import SecretClient
+except Exception:
+    SecretClient = None
 import asyncio
 import re
 import hashlib
@@ -123,32 +128,65 @@ def delete_search_index(app_id: str) -> bool:
         return False
 
 
+def _get_kv_secret(secret_name: str) -> Optional[str]:
+    """Retrieve a single secret value from Key Vault using DefaultAzureCredential.
+
+    Expects KEYVAULT_URL in environment. Returns None if not available or on failure.
+    """
+    try:
+        if not SecretClient:
+            logger.debug("SecretClient unavailable (azure-keyvault-secrets not installed)")
+            return None
+        kv_url = os.getenv("KEYVAULT_URL") or os.getenv("KEY_VAULT_URL")
+        if not kv_url:
+            logger.debug("KEYVAULT_URL not set; skipping Key Vault secret retrieval for %s", secret_name)
+            return None
+        cred = SyncDefaultAzureCredential(exclude_shared_token_cache_credential=True)
+        sc = SecretClient(vault_url=kv_url, credential=cred)
+        return sc.get_secret(secret_name).value
+    except Exception as ex:
+        logger.warning(f"Key Vault secret fetch failed for {secret_name}: {ex}")
+        return None
+
 async def trigger_indexing_function(app_id: str, container_name: str) -> Dict[str, Any]:
-    """Trigger the indexing function app and return the result."""
+    """Trigger the indexing function app and return the result.
+
+    Resolution order for function key:
+      1. AZURE_INDEXING_FUNCTION_KEY env var
+      2. Secret in Key Vault named INDEXING-FUNCTION-KEY (configurable via AZURE_INDEXING_FUNCTION_KEY_SECRET_NAME)
+      3. No key (public function) if neither available.
+    """
     function_url = os.getenv("AZURE_INDEXING_FUNCTION_URL")
-    function_key = os.getenv("AZURE_INDEXING_FUNCTION_KEY")
-    
     if not function_url:
         raise ValueError("AZURE_INDEXING_FUNCTION_URL not set")
-    
-    headers = {
-        "Content-Type": "application/json"
-    }
+
+    # Get key from env or Key Vault
+    function_key = os.getenv("AZURE_INDEXING_FUNCTION_KEY")
+    if not function_key:
+        secret_name = os.getenv("AZURE_INDEXING_FUNCTION_KEY_SECRET_NAME", "INDEXING-FUNCTION-KEY")
+        function_key = _get_kv_secret(secret_name)
+        if function_key:
+            logger.debug(f"Retrieved function key from Key Vault secret '{secret_name}'")
+        else:
+            logger.debug("No function key found in env or Key Vault; invoking without key header")
+
+    headers = {"Content-Type": "application/json"}
     if function_key:
         headers["x-functions-key"] = function_key
-    
-    payload = {
-        "appId": app_id,
-        "container": container_name
-    }
-    
+
+    payload = {"appId": app_id, "container": container_name}
+
     logger.debug(f"Triggering indexing function for appId={app_id}, container={container_name}")
     logger.debug(f"Function URL: {function_url}")
-    
+
     async with aiohttp.ClientSession() as session:
         async with session.post(function_url, json=payload, headers=headers) as response:
-            result = await response.json()
-            logger.debug(f"Indexing function response: {result}")
+            try:
+                result = await response.json()
+            except Exception:
+                text = await response.text()
+                result = {"status": "error", "raw": text, "http_status": response.status}
+            logger.debug(f"Indexing function response ({response.status}): {result}")
             return result
 
 
@@ -1005,6 +1043,11 @@ IMPORTANT:
                                         }
                         except Exception as ex:
                             logger.error(f"Query failed for {server_name}: {ex}")
+                        # finally:
+                        #     try:
+                        #         await ai_client.agents.threads.delete(thread_id=thread.id)
+                        #     except Exception as _del_ex:
+                        #         logger.debug(f"Thread delete failed (infrastructure query {server_name}): {_del_ex}")
             except Exception as ex:
                 logger.error(f"Failed to query infrastructure for {server_name}: {ex}")
                 return {}
@@ -1674,9 +1717,6 @@ IMPORTANT:
                 continue
             
             try:
-                # Skip message clearing to avoid "message not found" errors
-                # The persistent thread will maintain conversation context
-                # which can actually be beneficial for related questions
                 
                 # Get response using persistent thread via direct API calls
                 try:
@@ -2000,6 +2040,186 @@ IMPORTANT:
         except Exception as ex:
             print(f"Error during low confidence resolution: {ex}")
 
+    async def _export_app_tables_to_blob(app_id: str) -> dict:
+        """Export application-specific Azure Table entities into a single JSONL blob for indexing.
+
+        Returns dict with status, blob_url (if uploaded), records, tables_exported.
+        """
+        try:
+            from azure.data.tables import TableServiceClient
+            from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
+            from azure.storage.blob import BlobServiceClient
+            import io, json, datetime
+
+            logger.debug(f"[export] Starting export for app_id={app_id}")
+            # Core tables for the app. Allow override via env (comma-separated)
+            env_tables = os.getenv("APP_TABLE_EXPORT_LIST")
+            if env_tables:
+                tables = [t.strip() for t in env_tables.split(",") if t.strip()]
+                logger.debug(f"[export] Using tables from APP_TABLE_EXPORT_LIST env: {tables}")
+            else:
+                tables = [
+                    f"AppDetails{app_id}",
+                    f"PrivacyAndSecurity{app_id}",
+                    f"MSSQLDB{app_id}",
+                    f"OracleDB{app_id}",
+                    f"IntegrationDependency{app_id}",
+                    f"InfrastructureDetails{app_id}"
+                ]
+                logger.debug(f"[export] Using default table list: {tables}")
+
+            conn_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+            if conn_str:
+                tsc = TableServiceClient.from_connection_string(conn_str)
+                bsc = BlobServiceClient.from_connection_string(conn_str)
+                logger.debug("[export] Initialized TableServiceClient & BlobServiceClient via connection string")
+            else:
+                tables_url = os.getenv("AZURE_TABLES_ACCOUNT_URL")
+                account_url = os.getenv("AZURE_STORAGE_ACCOUNT_URL") or (tables_url.replace(".table.", ".blob.") if tables_url else None)
+                if not tables_url or not account_url:
+                    logger.debug("[export] Missing tables_url or account_url for AAD credential path")
+                    return {"status": "error", "message": "Missing table/blob account URLs"}
+                cred = SyncDefaultAzureCredential(exclude_shared_token_cache_credential=True)
+                tsc = TableServiceClient(endpoint=tables_url, credential=cred)
+                bsc = BlobServiceClient(account_url=account_url, credential=cred)
+                logger.debug(f"[export] Initialized clients via AAD tables_url={tables_url} account_url={account_url}")
+
+            # Ensure container exists (already created earlier normally)
+            container_name = app_id.lower()
+            container_name = re.sub(r"[^a-z0-9-]", "-", container_name)
+            logger.debug(f"Using blob container: {container_name}")
+            try:
+                blob_container = bsc.get_container_client(container_name)
+                blob_container.get_container_properties()
+            except Exception:
+                try:
+                    blob_container = bsc.create_container(container_name)
+                except Exception:
+                    pass
+                blob_container = bsc.get_container_client(container_name)
+
+            total_records = 0
+            exported_tables = []
+            per_table_counts = {}
+            buf = io.StringIO()
+
+            for table in tables:
+                original_table = table
+                logger.debug(f"[export] Processing table {original_table}")
+                probe_error = None
+                try:
+                    tc = tsc.get_table_client(table_name=table)
+                    # Quick existence probe: use list_entities (no filter) with an iterator
+                    try:
+                        ent_iter = tc.list_entities(results_per_page=1)
+                        first = next(iter(ent_iter), None)
+                        if first is not None:
+                            logger.debug(f"[export] Table {original_table} exists (first entity present)")
+                        else:
+                            logger.debug(f"[export] Table {original_table} exists but returned no entities on probe")
+                    except TypeError as te:
+                        # Some SDK versions may not support results_per_page param for list_entities
+                        logger.debug(f"[export] Probe TypeError for table {original_table}: {te}; retrying simplified probe")
+                        try:
+                            ent_iter = tc.list_entities()
+                            first = next(iter(ent_iter), None)
+                            if first is not None:
+                                logger.debug(f"[export] Table {original_table} exists (simplified probe)" )
+                            else:
+                                logger.debug(f"[export] Table {original_table} exists but empty (simplified probe)")
+                        except Exception as inner_probe_ex:
+                            probe_error = inner_probe_ex
+                            logger.debug(f"[export] Simplified probe failed for {original_table}: {inner_probe_ex}")
+                    except Exception as generic_probe_ex:
+                        probe_error = generic_probe_ex
+                        logger.debug(f"[export] Probe failed for {original_table}: {generic_probe_ex}")
+                except Exception as ex_access:
+                    logger.debug(f"[export] Table {original_table} access error: {ex_access}")
+                    per_table_counts[original_table] = {"exists": False, "exported": 0, "error": str(ex_access)}
+                    continue
+
+                entities = []
+                escaped = str(app_id).replace("'", "''")
+                # Primary attempt: partition filter
+                try:
+                    entities = list(tc.query_entities(query_filter=f"PartitionKey eq '{escaped}'"))
+                    logger.debug(f"[export] Table {original_table} partition query returned {len(entities)} entities for PartitionKey={escaped}")
+                except Exception as pe:
+                    logger.debug(f"[export] Table {original_table} partition query error: {pe}")
+                    entities = []
+
+                # Fallback: full scan (paginated) then client filter if partition key differs (case sensitivity or naming differences)
+                if not entities:
+                    logger.debug(f"[export] Table {original_table} performing fallback scan")
+                    try:
+                        try:
+                            scan_iter = tc.list_entities(results_per_page=200)
+                        except TypeError:
+                            # Older signature without results_per_page
+                            scan_iter = tc.list_entities()
+                        count_limit = 5000
+                        temp = []
+                        for ent in scan_iter:
+                            temp.append(ent)
+                            if len(temp) >= count_limit:
+                                break
+                        logger.debug(f"[export] Table {original_table} fallback scan collected {len(temp)} entities (pre-filter)")
+                        lowered_app = app_id.lower()
+                        filtered = [r for r in temp if str(r.get("PartitionKey", "")).lower() == lowered_app or lowered_app in str(r.get("PartitionKey", "")).lower()]
+                        # If few overall, keep all; else prefer filtered subset
+                        entities = filtered if filtered else (temp if len(temp) <= 200 else [])
+                        logger.debug(f"[export] Table {original_table} post-filter entity count {len(entities)}")
+                    except Exception as fallback_ex:
+                        logger.debug(f"[export] Table {original_table} fallback scan error: {fallback_ex}")
+                        if probe_error:
+                            per_table_counts[original_table] = {"exists": probe_error is None, "exported": 0, "probe_error": str(probe_error), "fallback_error": str(fallback_ex)}
+                        entities = []
+
+                if not entities:
+                    per_table_counts[original_table] = {"exists": True, "exported": 0, "note": "no entities after queries"}
+                    logger.debug(f"[export] Table {original_table} no entities exported")
+                    continue
+
+                exported_tables.append(original_table)
+                exported_count = 0
+                for e in entities:
+                    # Remove service metadata for cleaner indexing
+                    e.pop("etag", None)
+                    e.pop("Timestamp", None)
+                    e["_SourceTable"] = original_table
+                    pk = e.get("PartitionKey", "")
+                    rk = e.get("RowKey", "")
+                    e["Key"] = f"{pk}_{rk}" if pk else rk
+                    buf.write(json.dumps(e, ensure_ascii=False) + "\n")
+                    total_records += 1
+                    exported_count += 1
+                per_table_counts[original_table] = {"exists": True, "exported": exported_count}
+                logger.debug(f"[export] Table {original_table} exported {exported_count} entities (cumulative total {total_records})")
+
+            if total_records == 0:
+                logger.debug("[export] No records exported from any table")
+                return {"status": "empty", "message": "No table data found to export", "per_table": per_table_counts}
+
+            ts = datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
+            blob_name = f"tables_snapshot_{app_id}_{ts}.jsonl"
+            data_bytes = buf.getvalue().encode("utf-8")
+            blob_client = blob_container.get_blob_client(blob_name)
+            logger.debug(f"[export] Uploading blob {blob_name} size={len(data_bytes)} bytes")
+            blob_client.upload_blob(data_bytes, overwrite=True)
+            blob_url = getattr(blob_client, "url", blob_name)
+            logger.debug(f"[export] Export complete records={total_records} blob_url={blob_url}")
+            return {
+                "status": "ok",
+                "blob_url": blob_url,
+                "records": total_records,
+                "tables_exported": exported_tables,
+                "blob_name": blob_name,
+                "per_table": per_table_counts
+            }
+        except Exception as ex:
+            logger.error(f"Failed to export tables: {ex}", exc_info=True)
+            return {"status": "error", "message": str(ex)}
+
     # Main chat loop logic
     async with DefaultAzureCredential(exclude_shared_token_cache_credential=True) as creds:
         async with AzureAIAgent.create_client(credential=creds, endpoint=endpoint) as client:
@@ -2026,24 +2246,94 @@ IMPORTANT:
                 agent = AzureAIAgent(client=client, definition=agent_definition)
 
             thread: Optional[AzureAIAgentThread] = None
+
+            # --- New: Create initial thread and kickoff run so that Step 1 is invoked via agent tools ---
+            kickoff_run_completed = False
+            kickoff_thread_id: Optional[str] = None
+            try:
+                kickoff_thread = await client.agents.threads.create()
+                kickoff_thread_id = kickoff_thread.id
+                # Store for reuse by answer agent / other agents (user request: reuse same thread)
+                agent_threads[agent_definition.id] = kickoff_thread_id
+                # Also pre-assign this as the persistent answer agent thread id so downstream processing reuses it
+                answer_agent_thread_id = kickoff_thread_id
+                # Provide initial system/user prompt instructing orchestrator to execute first step only then stop.
+                initial_prompt = (
+                    "You are the orchestrator agent for application ID '" + application_id + "'. "
+                    "Immediately perform STEP 1 of the workflow ONLY: call the tool/function clone_all_templates to clone all required template tables. "
+                    "After the tool completes, summarize the result briefly (one line) and DO NOT proceed to any other steps or actions. "
+                    "End the run after reporting the summary so that other specialized agents can continue using this same thread."
+                )
+                await client.agents.messages.create(
+                    thread_id=kickoff_thread_id,
+                    role="user",
+                    content=initial_prompt
+                )
+                kickoff_run = await client.agents.runs.create(
+                    thread_id=kickoff_thread_id,
+                    agent_id=agent_definition.id
+                )
+                # Poll for completion
+                import asyncio as _asyncio_poll
+                _poll_wait = 0
+                while kickoff_run.status in ["queued", "in_progress", "requires_action"] and _poll_wait < 60:
+                    await _asyncio_poll.sleep(1)
+                    _poll_wait += 1
+                    kickoff_run = await client.agents.runs.get(thread_id=kickoff_thread_id, run_id=kickoff_run.id)
+                if kickoff_run.status == "completed":
+                    kickoff_run_completed = True
+                    # Retrieve last assistant message for logging
+                    try:
+                        msgs = client.agents.messages.list(thread_id=kickoff_thread_id)
+                        async for m in msgs:
+                            if m.role == "assistant":
+                                txt = m.content[0].text.value if m.content else ""
+                                logger.debug(f"Kickoff assistant message: {txt[:300]}")
+                                break
+                    except Exception:
+                        pass
+                else:
+                    logger.warning(f"Kickoff run did not complete successfully (status={kickoff_run.status}). Will fallback to manual Step 1.")
+                # Prepare AzureAIAgentThread object for future chat reuse
+                if kickoff_thread_id:
+                    thread = AzureAIAgentThread(client=client, thread_id=kickoff_thread_id)
+            except Exception as kickoff_ex:
+                logger.warning(f"Failed to perform kickoff run: {kickoff_ex}")
             
             # Startup sequence
             print(f"\n=== Starting Application Setup for '{application_id}' ===\n")
             
             # Step 1: Clone all template tables
-            print("Step 1: Creating application-specific tables...")
             plugin = OrchestratorPlugin()
-            clone_result = plugin.clone_all_templates()
-            clone_data = json.loads(clone_result)
-            if clone_data.get("result") == "ok":
-                print("✓ Tables created:")
-                for template, result in clone_data.get("cloned", {}).items():
-                    if result.get("status") == "created":
-                        print(f"  - {result.get('table')}: {result.get('copied')} questions copied")
-                    elif result.get("status") == "exists":
-                        print(f"  - {result.get('table')}: Already exists")
+            if kickoff_run_completed:
+                # We still query to show a user-facing summary of table states using direct tool (idempotent)
+                try:
+                    clone_result = plugin.clone_all_templates()
+                    clone_data = json.loads(clone_result)
+                    if clone_data.get("result") == "ok":
+                        print("✓ Tables verified/created:")
+                        for template, result in clone_data.get("cloned", {}).items():
+                            if result.get("status") == "created":
+                                print(f"  - {result.get('table')}: {result.get('copied')} questions copied")
+                            elif result.get("status") == "exists":
+                                print(f"  - {result.get('table')}: Already exists")
+                    else:
+                        print(f"⚠ Verification after kickoff run reported: {clone_data}")
+                except Exception as _post_verify_ex:
+                    print(f"⚠ Could not verify tables after kickoff run: {_post_verify_ex}")
             else:
-                print(f"✗ Failed to create tables: {clone_data}")
+                print("Step 1: Creating application-specific tables (fallback manual invocation)...")
+                clone_result = plugin.clone_all_templates()
+                clone_data = json.loads(clone_result)
+                if clone_data.get("result") == "ok":
+                    print("✓ Tables created:")
+                    for template, result in clone_data.get("cloned", {}).items():
+                        if result.get("status") == "created":
+                            print(f"  - {result.get('table')}: {result.get('copied')} questions copied")
+                        elif result.get("status") == "exists":
+                            print(f"  - {result.get('table')}: Already exists")
+                else:
+                    print(f"✗ Failed to create tables: {clone_data}")
             
             # Step 2: Create container
             print("\nStep 2: Ensuring blob container exists...")
@@ -2191,22 +2481,50 @@ IMPORTANT:
             
             print(f"\n=== Setup Complete ===")
             print(f"Orchestrator ready. Type 'help' for available commands or 'exit' to quit.\n")
-            
-            # Run ASR Agent after setup completion
+            # Intermediate Step: Index consolidated table content
+            print("\nIndex application tables into search index")
+            proceed_index = input("Proceed to export & reindex table data into search? (yes/no): ").strip().lower()
+            if proceed_index in ["yes", "y"]:
+                print("  - Exporting tables to blob snapshot...")
+                export_info = await _export_app_tables_to_blob(application_id)
+                if export_info.get("status") == "ok":
+                    print(f"  ✓ Exported {export_info['records']} records from {len(export_info['tables_exported'])} tables")
+                    print(f"    Blob: {export_info.get('blob_name')}")
+                    per = export_info.get("per_table", {})
+                    if per:
+                        print("    Per-table counts:")
+                        for t, meta in per.items():
+                            print(f"      - {t}: exported={meta.get('exported')} exists={meta.get('exists')}")
+                elif export_info.get("status") == "empty":
+                    print("  ⚠ No table data found to export. Continuing.")
+                    per = export_info.get("per_table", {})
+                    if per:
+                        print("    Diagnostics:")
+                        for t, meta in per.items():
+                            print(f"      - {t}: exported={meta.get('exported')} exists={meta.get('exists')}")
+                    print("    Hints: Verify tables have PartitionKey='" + application_id + "' or set APP_TABLE_EXPORT_LIST if custom names.")
+                else:
+                    print(f"  ⚠ Export failed: {export_info.get('message')}")
+                print("  - Triggering search indexing function to incorporate latest table data...")
+                idx_ok = await _trigger_and_check_indexing(application_id)
+                if idx_ok:
+                    print("  ✓ Reindex triggered/completed successfully with table snapshot")
+                else:
+                    print("  ⚠ Reindex did not confirm document ingestion")
+            else:
+                print("  Skipping intermediate reindex step at user request.")
+
+            # Run ASR Agent after intermediate indexing
             print(f"\n=== Running ASR Agent ===")
             print(f"Invoking ASR Agent for Application ID: {application_id}")
             try:
-                # Get the thread ID from agent_threads and create an AzureAIAgentThread object
                 thread_id = agent_threads.get(agent_id) or answer_agent_thread_id
                 asr_thread = None
-                
                 if thread_id:
-                    # Create AzureAIAgentThread object from existing thread ID
                     asr_thread = AzureAIAgentThread(client=client, thread_id=thread_id)
                     print(f"Using existing thread ID: {thread_id}")
                 else:
                     print("No existing thread found, ASR agent will create a new one")
-                
                 asr_result = await run_asr_agent(application_id, client, asr_thread)
                 if asr_result.get("status") == "success":
                     print(f"✓ ASR Agent execution completed successfully")
@@ -2218,11 +2536,8 @@ IMPORTANT:
                     # Store ASR agent ID for cleanup
                     if asr_result.get('agent_id'):
                         answer_agent_ids.add(asr_result.get('agent_id'))
-                    
-                    # Update thread if ASR agent created/used one
                     if asr_result.get('thread'):
                         thread = asr_result.get('thread')
-                        
                 else:
                     print(f"⚠ ASR Agent execution failed: {asr_result.get('message', 'Unknown error')}")
             except Exception as ex:
